@@ -1,0 +1,16 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find required dependencies
+find_dependency(Threads REQUIRED)
+
+# Find optional dependencies based on build configuration
+if(@DANP_ZMQ_SUPPORT@)
+    find_dependency(ZeroMQ REQUIRED)
+endif()
+
+# Include the targets file
+include("${CMAKE_CURRENT_LIST_DIR}/danpTargets.cmake")
+
+check_required_components(danp)
