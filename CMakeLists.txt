@@ -32,6 +32,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Dependencies
 # ============================================================================
 find_package(Threads REQUIRED)
+find_package(osal REQUIRED)
 
 if(DANP_ZMQ_SUPPORT)
     find_package(ZeroMQ REQUIRED)
@@ -52,11 +53,6 @@ target_sources(danp
         src/danp.c
         src/danpSocket.c
 )
-
-# Architecture-specific sources
-if(DANP_ARCH_POSIX)
-    target_sources(danp PRIVATE src/arch/danpPosix.c)
-endif()
 
 if(DANP_ARCH_FREERTOS)
     target_sources(danp PRIVATE src/arch/danpFreeRTOS.c)
@@ -82,6 +78,7 @@ target_include_directories(danp
 target_link_libraries(danp
     PUBLIC
         Threads::Threads
+        osal::osal
 )
 
 if(DANP_ZMQ_SUPPORT)

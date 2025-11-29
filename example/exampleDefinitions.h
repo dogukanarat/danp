@@ -5,12 +5,13 @@
 #ifndef INC_EXAMPLE_DEFINITIONS_H
 #define INC_EXAMPLE_DEFINITIONS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Includes */
 
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 /* Configurations */
 

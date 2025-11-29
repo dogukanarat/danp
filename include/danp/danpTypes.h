@@ -6,7 +6,8 @@
 #define INC_DANP_TYPES_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 /* Includes */
@@ -25,6 +26,11 @@ extern "C" {
 #ifndef PACKED
 /** @brief Packed attribute for structures. */
 #define PACKED __attribute__((packed))
+#endif
+
+#ifndef UNUSED
+/** @brief Macro to mark unused variables and avoid compiler warnings. */
+#define UNUSED(x) (void)(x)
 #endif
 
 /* Types */

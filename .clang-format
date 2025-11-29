@@ -1,5 +1,62 @@
-BasedOnStyle: Google
+# .clang-format for libscaffold
+# Based on LLVM style with custom modifications
+
+BasedOnStyle: LLVM
+
+# Language settings
+Language: Cpp
+Standard: c++03
+
+# Indentation
 IndentWidth: 4
-ColumnLimit: 100
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+IndentCaseLabels: false
+IndentPPDirectives: None
+IndentExternBlock: NoIndent
+
+# Braces - All on new lines (Allman style)
+BreakBeforeBraces: Allman
+
+# Pointer and reference alignment - close to name
+PointerAlignment: Right
+ReferenceAlignment: Right
+DerivePointerAlignment: false
+
+# Function declarations and definitions
+AlwaysBreakAfterReturnType: None
+AlwaysBreakAfterDefinitionReturnType: None
 AllowShortFunctionsOnASingleLine: None
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: false
+BinPackArguments: false
+
+# Function signature formatting
+AlignAfterOpenBracket: AlwaysBreak
+AllowAllArgumentsOnNextLine: false
+
+# Spacing
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpacesInCStyleCastParentheses: false
+
+# Line breaking
+ColumnLimit: 100
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+
+# Comments
+ReflowComments: false
+SpacesBeforeTrailingComments: 1
+
+# Includes
+SortIncludes: true
+IncludeBlocks: Preserve
+
+# Other
 KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 2
