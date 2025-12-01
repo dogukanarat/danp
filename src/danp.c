@@ -6,6 +6,7 @@
 
 #include "osal/osal.h"
 #include "danp/danp.h"
+#include "danp/danpBuffer.h"
 #include "danpDebug.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -25,17 +26,8 @@ extern void danpSocketInputHandler(danpPacket_t *pkt);
 
 /* Variables */
 
-/** @brief Pool of packets for allocation. */
-static danpPacket_t PacketPool[DANP_POOL_SIZE];
-
-/** @brief Map of free packets in the pool. */
-static bool PacketFreeMap[DANP_POOL_SIZE];
-
 /** @brief List of registered network interfaces. */
 static danpInterface_t *IfaceList = NULL;
-
-/** @brief Semaphore to protect the packet pool. */
-static osalSemaphoreHandle_t PoolLock = NULL; // Update type to match osalSemCreate
 
 /** @brief Global configuration structure. */
 danpConfig_t DanpConfig;
@@ -118,102 +110,53 @@ void danpUnpackHeader(
  */
 void danpInit(const danpConfig_t *config)
 {
-    osalSemaphoreAttr_t semAttr = {
-        .name = "DanpPoolLock",
-        .maxCount = 1,
-        .initialCount = 1,
-        .cbMem = NULL,
-        .cbSize = 0,
-    };
-
     for (;;)
     {
         memcpy(&DanpConfig, config, sizeof(danpConfig_t));
-        for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
-        {
-            PacketFreeMap[i] = true;
-        }
-
-        PoolLock = osalSemaphoreCreate(&semAttr);
-        osalSemaphoreGive(PoolLock);
-
-        danpLogMessage(DANP_LOG_INFO, "DANP packet pool initialized");
+        danpSocketInit();
+        danpBufferInit();
 
         break;
     }
 
-}
-
-/**
- * @brief Allocate a packet from the pool.
- * @return Pointer to the allocated packet, or NULL if pool is empty.
- */
-danpPacket_t *danpAllocPacket(void)
-{
-    danpPacket_t *pkt = NULL;
-
-    for (;;)
-    {
-        if (0 == osalSemaphoreTake(PoolLock, 100))
-        {
-            for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
-            {
-                if (PacketFreeMap[i])
-                {
-                    PacketFreeMap[i] = false;
-                    pkt = &PacketPool[i];
-                    break;
-                }
-            }
-            osalSemaphoreGive(PoolLock);
-        }
-
-        if (pkt)
-        {
-            danpLogMessage(DANP_LOG_VERBOSE, "Allocated packet from pool");
-            break;
-        }
-        else
-        {
-            danpLogMessage(DANP_LOG_ERROR, "Packet pool out of memory or locked");
-            break;
-        }
-
-        break;
-    }
-
-    return pkt;
-}
-
-/**
- * @brief Free a packet back to the pool.
- * @param pkt Pointer to the packet to free.
- */
-void danpFreePacket(danpPacket_t *pkt)
-{
-    int32_t index = pkt - PacketPool;
-    if (index >= 0 && index < DANP_POOL_SIZE)
-    {
-        if (0 == osalSemaphoreTake(PoolLock, 100))
-        {
-            PacketFreeMap[index] = true;
-            osalSemaphoreGive(PoolLock);
-            danpLogMessage(DANP_LOG_VERBOSE, "Freed packet to pool");
-        }
-    }
-    else
-    {
-        danpLogMessage(DANP_LOG_WARN, "Attempted to free invalid packet");
-    }
 }
 
 /**
  * @brief Register a network interface.
  * @param iface Pointer to the interface to register.
  */
-void danpRegisterInterface(danpInterface_t *iface)
+void danpRegisterInterface(void *iface)
 {
-    iface->next = IfaceList;
+    danpInterface_t *ifaceCommon = iface;
+    if (!ifaceCommon)
+    {
+        danpLogMessage(DANP_LOG_ERROR, "Cannot register NULL interface");
+        return;
+    }
+    if (!ifaceCommon->txFunc)
+    {
+        danpLogMessage(DANP_LOG_ERROR, "Interface txFunc is NULL, cannot register");
+        return;
+    }
+    if (!ifaceCommon->name)
+    {
+        danpLogMessage(DANP_LOG_ERROR, "Interface name is NULL, cannot register");
+        return;
+    }
+    if (ifaceCommon->mtu == 0)
+    {
+        danpLogMessage(DANP_LOG_ERROR, "Interface MTU is zero, cannot register");
+        return;
+    }
+    if (!IfaceList)
+    {
+        danpLogMessage(DANP_LOG_INFO, "Registering first network interface: %s", ifaceCommon->name);
+    }
+    else
+    {
+        danpLogMessage(DANP_LOG_INFO, "Registering network interface: %s", ifaceCommon->name);
+    }
+    ifaceCommon->next = IfaceList;
     IfaceList = iface;
     danpLogMessage(DANP_LOG_VERBOSE, "Registered network interface");
 }
@@ -248,7 +191,7 @@ int32_t danpRouteTx(danpPacket_t *pkt)
     }
     danpLogMessage(
         DANP_LOG_DEBUG,
-        "TX dst=%u src=%u dPort=%u sPort=%u flags=0x%02X len=%u via iface=%s",
+        "TX [dst]=%u, [src]=%u, [dPort]=%u, [sPort]=%u, [flags]=0x%02X, [len]=%u, [iface]=%s",
         dst,
         src,
         dstPort,
@@ -272,7 +215,7 @@ void danpInput(danpInterface_t *iface, uint8_t *rawData, uint16_t len)
         danpLogMessage(DANP_LOG_WARN, "Received packet too short, dropping");
         return;
     }
-    danpPacket_t *pkt = danpAllocPacket();
+    danpPacket_t *pkt = danpBufferAllocate();
     if (!pkt)
     {
         danpLogMessage(DANP_LOG_ERROR, "No memory for incoming packet, dropping");
@@ -292,13 +235,15 @@ void danpInput(danpInterface_t *iface, uint8_t *rawData, uint16_t len)
 
     danpLogMessage(
         DANP_LOG_DEBUG,
-        "RX dst=%u src=%u dPort=%u sPort=%u flags=0x%02X len=%u",
+        "RX [dst]=%u [src]=%u [dPort]=%u [sPort]=%u [flags]=0x%02X [len]=%u, [iface]=%s",
         dst,
         src,
         dstPort,
         srcPort,
         flags,
-        pkt->length);
+        pkt->length,
+        iface->name
+    );
 
     if (dst == iface->address)
     {
@@ -308,7 +253,7 @@ void danpInput(danpInterface_t *iface, uint8_t *rawData, uint16_t len)
     else
     {
         danpLogMessage(DANP_LOG_INFO, "Packet not for local node, dropping");
-        danpFreePacket(pkt);
+        danpBufferFree(pkt);
     }
 }
 
