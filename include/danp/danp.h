@@ -110,7 +110,7 @@ typedef enum danpSocketState_e
 } danpSocketState_t;
 
 /** @brief Handle for an OS queue. */
-typedef osalQueueHandle_t danpOsQueueHandle_t;
+typedef osalMessageQueueHandle_t danpOsQueueHandle_t;
 
 /** @brief Handle for an OS semaphore. */
 typedef osalSemaphoreHandle_t danpOsSemaphoreHandle_t;
@@ -170,7 +170,7 @@ typedef struct danpInterface_s
      * @param packet Pointer to the packet to transmit.
      * @return 0 on success, negative on error.
      */
-    int32_t (*txFunc)(struct danpInterface_s *iface, danpPacket_t *packet);
+    int32_t (*txFunc)(void *ifaceCommon, danpPacket_t *packet);
 
     struct danpInterface_s *next; /**< Pointer to the next interface in the list. */
 } danpInterface_t;
@@ -270,21 +270,27 @@ void danpInput(danpInterface_t *iface, uint8_t *data, uint16_t length);
  * @brief Allocate a packet from the pool.
  * @return Pointer to the allocated packet, or NULL if pool is empty.
  */
-danpPacket_t *danpAllocPacket(void);
+danpPacket_t *danpBufferAllocate(void);
 
 /**
  * @brief Free a packet back to the pool.
  * @param packet Pointer to the packet to free.
  */
-void danpFreePacket(danpPacket_t *packet);
+void danpBufferFree(danpPacket_t *packet);
 
 /**
  * @brief Register a network interface.
  * @param iface Pointer to the interface to register.
  */
-void danpRegisterInterface(danpInterface_t *iface);
+void danpRegisterInterface(void *iface);
 
 // Socket API
+
+/**
+ * @brief Initialize the socket subsystem.
+ * @return int32_t
+ */
+int32_t danpSocketInit(void);
 
 /**
  * @brief Create a new DANP socket.
