@@ -28,6 +28,7 @@ extern "C" {
 extern int32_t danpBufferInit(void);
 extern danpPacket_t *danpBufferAllocate(void);
 extern void danpBufferFree(danpPacket_t *pkt);
+extern size_t danpBufferGetFreeCount(void);
 
 #ifdef __cplusplus
 }

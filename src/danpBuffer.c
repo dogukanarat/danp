@@ -159,3 +159,39 @@ void danpBufferFree(danpPacket_t *pkt)
         osalMutexUnlock(BufferMutex);
     }
 }
+
+/**
+ * @brief Get the number of free packets in the pool.
+ * @return Number of free packets.
+ */
+size_t danpBufferGetFreeCount(void)
+{
+    size_t freeCount = 0;
+    bool isMutexTaken = false;
+
+    for (;;)
+    {
+        if (0 != osalMutexLock(BufferMutex, OSAL_WAIT_FOREVER))
+        {
+            break;
+        }
+        isMutexTaken = true;
+
+        for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
+        {
+            if (PacketFreeMap[i])
+            {
+                freeCount++;
+            }
+        }
+
+        break;
+    }
+
+    if (isMutexTaken)
+    {
+        osalMutexUnlock(BufferMutex);
+    }
+
+    return freeCount;
+}

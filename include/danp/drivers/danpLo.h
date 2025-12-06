@@ -25,6 +25,7 @@ extern "C" {
 typedef struct danpLoInterface_s
 {
     danpInterface_t common;
+    void *context;
 } danpLoInterface_t;
 
 /* External Declarations */

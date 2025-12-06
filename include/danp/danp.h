@@ -123,10 +123,10 @@ typedef osalSemaphoreHandle_t danpOsSemaphoreHandle_t;
 typedef struct danpPacket_e
 {
     uint32_t headerRaw;                    /**< Raw header data. */
-    uint16_t length;                       /**< Length of the payload. */
     uint8_t payload[DANP_MAX_PACKET_SIZE]; /**< Payload data. */
 
-    struct danpInterface_s *rxInterface; /**< Interface where the packet was received. */
+    uint16_t length;                       /**< Length of the payload. */
+    struct danpInterface_s *rxInterface;   /**< Interface where the packet was received. */
 } danpPacket_t;
 
 /**
@@ -369,8 +369,7 @@ int32_t danpRecv(danpSocket_t *sock, void *buffer, uint16_t maxLen, uint32_t tim
  * @param dstPort Destination port number.
  * @return Number of bytes sent, or negative on error.
  */
-int32_t
-danpSendTo(danpSocket_t *sock, void *data, uint16_t len, uint16_t dstNode, uint16_t dstPort);
+int32_t danpSendTo(danpSocket_t *sock, void *data, uint16_t len, uint16_t dstNode, uint16_t dstPort);
 
 /**
  * @brief Receive data from any source (for DGRAM sockets).
@@ -389,6 +388,9 @@ int32_t danpRecvFrom(
     uint16_t *srcNode,
     uint16_t *srcPort,
     uint32_t timeoutMs);
+
+
+void danpPrintStats(void (*printFunc)(const char *fmt, ...));
 
 #ifdef __cplusplus
 }
