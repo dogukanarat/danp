@@ -27,8 +27,8 @@ function(danp_add_test TEST_NAME)
     add_executable(${TEST_NAME}
         ${ARG_SOURCE}
         ${ARG_ADDITIONAL_SOURCES}
-        mockDriver.c
-        logMessage.c
+        mock_driver.c
+        log_message.c
     )
     
     # Link against library and dependencies
@@ -58,9 +58,9 @@ endfunction()
 # ============================================================================
 # Test Targets
 # ============================================================================
-danp_add_test(test_core SOURCE testCore.c)
-danp_add_test(test_dgram SOURCE testDgram.c)
-danp_add_test(test_stream SOURCE testStream.c)
+danp_add_test(test_core SOURCE test_core.c)
+danp_add_test(test_dgram SOURCE test_dgram.c)
+danp_add_test(test_stream SOURCE test_stream.c)
 
 # ============================================================================
 # Code Coverage Target
@@ -77,8 +77,8 @@ if(ENABLE_COVERAGE)
         EXCLUDE
             'test/*'
             'unity/*'
-            '*/mockDriver.c'
-            '*/logMessage.c'
+            '*/mock_driver.c'
+            '*/log_message.c'
     )
 
     message(STATUS "Coverage target 'coverage' configured")
