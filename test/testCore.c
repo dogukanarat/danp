@@ -1,8 +1,22 @@
+/**
+ * @file testCore.c
+ * @brief Core functionality tests for DANP library
+ *
+ * This file contains unit tests for core DANP functionality including:
+ * - Header packing/unpacking operations
+ * - Memory pool management
+ * - Initialization and configuration
+ */
+
 #include "danp/danp.h"
 #include "unity.h"
 #include <string.h>
 
-// Helper to access internals if needed
+/* ============================================================================
+ * External Function Declarations
+ * ============================================================================
+ * These functions are internal to DANP but exposed for testing purposes
+ */
 extern uint32_t danpPackHeader(
     uint8_t prio,
     uint16_t dst,
@@ -10,6 +24,7 @@ extern uint32_t danpPackHeader(
     uint8_t dstPort,
     uint8_t srcPort,
     uint8_t flags);
+
 extern void danpUnpackHeader(
     uint32_t raw,
     uint16_t *dst,
@@ -18,133 +33,233 @@ extern void danpUnpackHeader(
     uint8_t *srcPort,
     uint8_t *flags);
 
+/* ============================================================================
+ * Test Setup and Teardown
+ * ============================================================================
+ */
+
+/**
+ * @brief Setup function called before each test
+ *
+ * Initializes the DANP library with a default local node address of 1
+ */
 void setUp(void)
 {
     danpConfig_t cfg = {.localNode = 1};
     danpInit(&cfg);
 }
 
+/**
+ * @brief Teardown function called after each test
+ */
 void tearDown(void)
 {
+    /* No cleanup needed for current tests */
 }
 
-void test_HeaderPacking_Should_PreserveValues(void)
+/* ============================================================================
+ * Header Packing Tests
+ * ============================================================================
+ */
+
+/**
+ * @brief Test that header packing and unpacking preserves all field values
+ *
+ * This test verifies that when we pack header fields into a 32-bit integer
+ * and then unpack them, all original values are correctly preserved.
+ */
+void test_header_packing_preserves_values(void)
 {
-    uint8_t prioIn = DANP_PRIORITY_HIGH;
-    uint16_t dstIn = 0xAB; // 171
-    uint16_t srcIn = 0x12; // 18
-    uint8_t dPortIn = 45;
-    uint8_t sPortIn = 12;
-    uint8_t flagsIn = DANP_FLAG_SYN;
+    /* Prepare input values for header fields */
+    uint8_t prio_in = DANP_PRIORITY_HIGH;
+    uint16_t dst_in = 0xAB;  /* Destination node: 171 */
+    uint16_t src_in = 0x12;  /* Source node: 18 */
+    uint8_t dst_port_in = 45;
+    uint8_t src_port_in = 12;
+    uint8_t flags_in = DANP_FLAG_SYN;
 
-    uint32_t raw = danpPackHeader(prioIn, dstIn, srcIn, dPortIn, sPortIn, flagsIn);
+    /* Pack the header into raw 32-bit format */
+    uint32_t raw_header = danpPackHeader(
+        prio_in, dst_in, src_in, dst_port_in, src_port_in, flags_in);
 
-    uint16_t dstOut, srcOut;
-    uint8_t dPortOut, sPortOut, flagsOut;
+    /* Prepare variables to receive unpacked values */
+    uint16_t dst_out, src_out;
+    uint8_t dst_port_out, src_port_out, flags_out;
 
-    danpUnpackHeader(raw, &dstOut, &srcOut, &dPortOut, &sPortOut, &flagsOut);
+    /* Unpack the header back into individual fields */
+    danpUnpackHeader(raw_header, &dst_out, &src_out, &dst_port_out, &src_port_out, &flags_out);
 
-    TEST_ASSERT_EQUAL_UINT16(dstIn, dstOut);
-    TEST_ASSERT_EQUAL_UINT16(srcIn, srcOut);
-    TEST_ASSERT_EQUAL_UINT8(dPortIn, dPortOut);
-    TEST_ASSERT_EQUAL_UINT8(sPortIn, sPortOut);
-    TEST_ASSERT_EQUAL_UINT8(flagsIn, flagsOut);
+    /* Verify all fields match the original input values */
+    TEST_ASSERT_EQUAL_UINT16(dst_in, dst_out);
+    TEST_ASSERT_EQUAL_UINT16(src_in, src_out);
+    TEST_ASSERT_EQUAL_UINT8(dst_port_in, dst_port_out);
+    TEST_ASSERT_EQUAL_UINT8(src_port_in, src_port_out);
+    TEST_ASSERT_EQUAL_UINT8(flags_in, flags_out);
 }
 
-void test_MemoryPool_Should_AllocateUntilExhaustion(void)
+/**
+ * @brief Test header packing with edge cases and various flag combinations
+ *
+ * This test verifies header packing works correctly with:
+ * - Minimum values (all zeros)
+ * - ACK flag
+ * - RST flag with non-zero values
+ */
+void test_header_packing_handles_edge_cases(void)
+{
+    /* Test Case 1: All fields set to minimum (zero) values */
+    uint32_t raw_header_1 = danpPackHeader(0, 0, 0, 0, 0, 0);
+    uint16_t dst_1, src_1;
+    uint8_t dst_port_1, src_port_1, flags_1;
+
+    danpUnpackHeader(raw_header_1, &dst_1, &src_1, &dst_port_1, &src_port_1, &flags_1);
+
+    TEST_ASSERT_EQUAL_UINT16(0, dst_1);
+    TEST_ASSERT_EQUAL_UINT16(0, src_1);
+    TEST_ASSERT_EQUAL_UINT8(0, dst_port_1);
+    TEST_ASSERT_EQUAL_UINT8(0, src_port_1);
+    TEST_ASSERT_EQUAL_UINT8(0, flags_1);
+
+    /* Test Case 2: Normal priority with ACK flag */
+    uint32_t raw_header_2 = danpPackHeader(DANP_PRIORITY_NORMAL, 10, 20, 30, 40, DANP_FLAG_ACK);
+    uint16_t dst_2, src_2;
+    uint8_t dst_port_2, src_port_2, flags_2;
+
+    danpUnpackHeader(raw_header_2, &dst_2, &src_2, &dst_port_2, &src_port_2, &flags_2);
+
+    TEST_ASSERT_EQUAL_UINT8(DANP_FLAG_ACK, flags_2);
+
+    /* Test Case 3: High priority with RST flag and larger node addresses */
+    uint32_t raw_header_3 = danpPackHeader(DANP_PRIORITY_HIGH, 100, 200, 5, 6, DANP_FLAG_RST);
+    uint16_t dst_3, src_3;
+    uint8_t dst_port_3, src_port_3, flags_3;
+
+    danpUnpackHeader(raw_header_3, &dst_3, &src_3, &dst_port_3, &src_port_3, &flags_3);
+
+    TEST_ASSERT_EQUAL_UINT16(100, dst_3);
+    TEST_ASSERT_EQUAL_UINT16(200, src_3);
+    TEST_ASSERT_EQUAL_UINT8(5, dst_port_3);
+    TEST_ASSERT_EQUAL_UINT8(6, src_port_3);
+    TEST_ASSERT_EQUAL_UINT8(DANP_FLAG_RST, flags_3);
+}
+
+/* ============================================================================
+ * Memory Pool Tests
+ * ============================================================================
+ */
+
+/**
+ * @brief Test memory pool allocation until exhaustion
+ *
+ * This test verifies:
+ * 1. All packets in the pool can be allocated
+ * 2. Allocation fails when pool is exhausted
+ * 3. Freeing a packet allows reallocation
+ */
+void test_memory_pool_allocates_until_exhaustion(void)
 {
     danpPacket_t *packets[DANP_POOL_SIZE];
 
-    // Allocate all
+    /* Step 1: Allocate all packets from the pool */
     for (int i = 0; i < DANP_POOL_SIZE; i++)
     {
         packets[i] = danpAllocPacket();
         TEST_ASSERT_NOT_NULL(packets[i]);
     }
 
-    // Next one should fail
-    danpPacket_t *failPkt = danpAllocPacket();
-    TEST_ASSERT_NULL(failPkt);
+    /* Step 2: Attempt to allocate beyond pool capacity - should fail */
+    danpPacket_t *fail_packet = danpAllocPacket();
+    TEST_ASSERT_NULL(fail_packet);
 
-    // Free one
+    /* Step 3: Free one packet to make room in the pool */
     danpFreePacket(packets[0]);
 
-    // Should succeed again
-    danpPacket_t *retryPkt = danpAllocPacket();
-    TEST_ASSERT_NOT_NULL(retryPkt);
+    /* Step 4: Allocation should now succeed again */
+    danpPacket_t *retry_packet = danpAllocPacket();
+    TEST_ASSERT_NOT_NULL(retry_packet);
 
-    // Cleanup
-    danpFreePacket(retryPkt);
+    /* Cleanup: Free all remaining packets */
+    danpFreePacket(retry_packet);
     for (int i = 1; i < DANP_POOL_SIZE; i++)
     {
         danpFreePacket(packets[i]);
     }
 }
 
-void test_HeaderPacking_Should_HandleEdgeCases(void)
+/**
+ * @brief Test that allocated packets have different memory addresses
+ *
+ * This test verifies that the memory pool returns distinct packet
+ * instances rather than reusing the same memory address.
+ */
+void test_packet_allocation_returns_different_packets(void)
 {
-    // Test with minimum values
-    uint32_t raw1 = danpPackHeader(0, 0, 0, 0, 0, 0);
-    uint16_t dst1, src1;
-    uint8_t dPort1, sPort1, flags1;
-    danpUnpackHeader(raw1, &dst1, &src1, &dPort1, &sPort1, &flags1);
-    TEST_ASSERT_EQUAL_UINT16(0, dst1);
-    TEST_ASSERT_EQUAL_UINT16(0, src1);
-    TEST_ASSERT_EQUAL_UINT8(0, dPort1);
-    TEST_ASSERT_EQUAL_UINT8(0, sPort1);
-    TEST_ASSERT_EQUAL_UINT8(0, flags1);
+    /* Allocate two packets from the pool */
+    danpPacket_t *packet_1 = danpAllocPacket();
+    danpPacket_t *packet_2 = danpAllocPacket();
 
-    // Test with various flags
-    uint32_t raw2 = danpPackHeader(DANP_PRIORITY_NORMAL, 10, 20, 30, 40, DANP_FLAG_ACK);
-    uint16_t dst2, src2;
-    uint8_t dPort2, sPort2, flags2;
-    danpUnpackHeader(raw2, &dst2, &src2, &dPort2, &sPort2, &flags2);
-    TEST_ASSERT_EQUAL_UINT8(DANP_FLAG_ACK, flags2);
+    /* Both allocations should succeed */
+    TEST_ASSERT_NOT_NULL(packet_1);
+    TEST_ASSERT_NOT_NULL(packet_2);
 
-    // Test with RST flag
-    uint32_t raw3 = danpPackHeader(DANP_PRIORITY_HIGH, 100, 200, 5, 6, DANP_FLAG_RST);
-    uint16_t dst3, src3;
-    uint8_t dPort3, sPort3, flags3;
-    danpUnpackHeader(raw3, &dst3, &src3, &dPort3, &sPort3, &flags3);
-    TEST_ASSERT_EQUAL_UINT16(100, dst3);
-    TEST_ASSERT_EQUAL_UINT16(200, src3);
-    TEST_ASSERT_EQUAL_UINT8(5, dPort3);
-    TEST_ASSERT_EQUAL_UINT8(6, sPort3);
-    TEST_ASSERT_EQUAL_UINT8(DANP_FLAG_RST, flags3);
+    /* The packets should have different memory addresses */
+    TEST_ASSERT_NOT_EQUAL(packet_1, packet_2);
+
+    /* Cleanup */
+    danpFreePacket(packet_1);
+    danpFreePacket(packet_2);
 }
 
-void test_PacketAllocation_Should_ReturnDifferentPackets(void)
+/* ============================================================================
+ * Initialization Tests
+ * ============================================================================
+ */
+
+/**
+ * @brief Test that initialization correctly sets the local node address
+ *
+ * This test verifies that when we initialize DANP with a specific local
+ * node address, all subsequently created sockets inherit that address.
+ */
+void test_init_sets_local_node(void)
 {
-    danpPacket_t *pkt1 = danpAllocPacket();
-    danpPacket_t *pkt2 = danpAllocPacket();
+    /* Initialize DANP with a specific local node address */
+    danpConfig_t config = {.localNode = 42, .logFunction = NULL};
+    danpInit(&config);
 
-    TEST_ASSERT_NOT_NULL(pkt1);
-    TEST_ASSERT_NOT_NULL(pkt2);
-    TEST_ASSERT_NOT_EQUAL(pkt1, pkt2);
+    /* Create a socket and verify it has the configured local node address */
+    danpSocket_t *socket = danpSocket(DANP_TYPE_DGRAM);
+    TEST_ASSERT_NOT_NULL(socket);
+    TEST_ASSERT_EQUAL_UINT16(42, socket->localNode);
 
-    danpFreePacket(pkt1);
-    danpFreePacket(pkt2);
+    /* Cleanup */
+    danpClose(socket);
 }
 
-void test_Init_Should_SetLocalNode(void)
-{
-    danpConfig_t cfg = {.localNode = 42, .logFunction = NULL};
-    danpInit(&cfg);
+/* ============================================================================
+ * Test Runner
+ * ============================================================================
+ */
 
-    // After init, any socket created should use this node
-    danpSocket_t *sock = danpSocket(DANP_TYPE_DGRAM);
-    TEST_ASSERT_NOT_NULL(sock);
-    TEST_ASSERT_EQUAL_UINT16(42, sock->localNode);
-    danpClose(sock);
-}
-
+/**
+ * @brief Main test runner
+ *
+ * Executes all core functionality tests in sequence
+ */
 int main(void)
 {
     UNITY_BEGIN();
-    RUN_TEST(test_HeaderPacking_Should_PreserveValues);
-    RUN_TEST(test_MemoryPool_Should_AllocateUntilExhaustion);
-    RUN_TEST(test_HeaderPacking_Should_HandleEdgeCases);
-    RUN_TEST(test_PacketAllocation_Should_ReturnDifferentPackets);
-    RUN_TEST(test_Init_Should_SetLocalNode);
+
+    /* Header packing tests */
+    RUN_TEST(test_header_packing_preserves_values);
+    RUN_TEST(test_header_packing_handles_edge_cases);
+
+    /* Memory pool tests */
+    RUN_TEST(test_memory_pool_allocates_until_exhaustion);
+    RUN_TEST(test_packet_allocation_returns_different_packets);
+
+    /* Initialization tests */
+    RUN_TEST(test_init_sets_local_node);
+
     return UNITY_END();
 }

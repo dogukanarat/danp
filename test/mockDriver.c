@@ -1,41 +1,98 @@
+/**
+ * @file mockDriver.c
+ * @brief Mock network driver for DANP testing
+ *
+ * This file implements a simple loopback network driver that simulates
+ * network communication by immediately feeding transmitted packets back
+ * into the receive path. This enables unit testing without real hardware.
+ */
+
 #include "danp/danp.h"
 #include "osal/osal.h"
 #include <stdio.h>
 #include <string.h>
 
-// Defines a fake interface
-static danpInterface_t MockIface;
-static uint16_t MyNodeId = 1;
+/* ============================================================================
+ * Module Variables
+ * ============================================================================
+ */
 
-// The TX function simply feeds data back into the Input
-int32_t mockLoopbackTx(danpInterface_t *iface, danpPacket_t *packet)
+/**
+ * @brief Mock interface structure for loopback testing
+ */
+static danpInterface_t mock_interface;
+
+/**
+ * @brief Local node ID for the mock driver
+ */
+static uint16_t my_node_id = 1;
+
+/* ============================================================================
+ * Internal Functions
+ * ============================================================================
+ */
+
+/**
+ * @brief Loopback transmit function
+ *
+ * This function simulates packet transmission by immediately feeding the
+ * packet back into the DANP input handler, creating a perfect loopback.
+ * This allows testing of protocol logic without real network hardware.
+ *
+ * @param iface Pointer to the network interface (unused in loopback)
+ * @param packet Pointer to the packet to transmit
+ * @return 0 on success, negative on error
+ */
+int32_t mock_loopback_tx(danpInterface_t *iface, danpPacket_t *packet)
 {
     uint8_t buffer[DANP_MAX_PACKET_SIZE + 4];
 
-    // Serialize just like a real driver would
+    /* Serialize packet into buffer (header + payload) */
+    /* Copy 4-byte header */
     memcpy(buffer, &packet->headerRaw, 4);
+
+    /* Copy payload if present */
     if (packet->length > 0)
     {
         memcpy(buffer + 4, packet->payload, packet->length);
     }
 
-    // Simulate "Network Delay" (Optional, usually 0 for unit tests)
+    /* Simulate network delay (optional, usually 0 for unit tests) */
+    /* In real drivers, this would transmit over the physical medium */
 
-    // Feed back into core
-    // We treat this as a perfect loopback: If I send it, I receive it.
-    // The Core's input filter will decide if it's actually for me (Dst == MyID).
+    /* Feed packet back into the DANP core as received data */
+    /* This creates a perfect loopback: if we send it, we immediately receive it */
+    /* The DANP core will filter based on destination address (dst == my_node_id) */
     danpInput(iface, buffer, 4 + packet->length);
 
     return 0;
 }
 
-void mockDriverInit(uint16_t nodeId)
-{
-    MyNodeId = nodeId;
-    MockIface.name = "LOOPBACK";
-    MockIface.address = nodeId;
-    MockIface.mtu = 128;
-    MockIface.txFunc = mockLoopbackTx;
+/* ============================================================================
+ * Public Functions
+ * ============================================================================
+ */
 
-    danpRegisterInterface(&MockIface);
+/**
+ * @brief Initialize the mock driver with loopback functionality
+ *
+ * This function sets up a fake network interface that loops back all
+ * transmitted packets. This is essential for unit testing socket operations
+ * without requiring actual network hardware or peer nodes.
+ *
+ * @param node_id The local node ID for this interface
+ */
+void mockDriverInit(uint16_t node_id)
+{
+    /* Store the node ID for reference */
+    my_node_id = node_id;
+
+    /* Configure the mock interface */
+    mock_interface.name = "LOOPBACK";
+    mock_interface.address = node_id;
+    mock_interface.mtu = 128;
+    mock_interface.txFunc = mock_loopback_tx;
+
+    /* Register the interface with the DANP core */
+    danpRegisterInterface(&mock_interface);
 }

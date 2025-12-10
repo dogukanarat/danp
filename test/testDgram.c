@@ -1,127 +1,221 @@
+/**
+ * @file testDgram.c
+ * @brief DGRAM (datagram) socket tests for DANP library
+ *
+ * This file contains unit tests for DANP datagram sockets including:
+ * - Socket creation and binding
+ * - Unreliable message transmission (UDP-like)
+ * - Multiple message handling
+ * - Loopback communication
+ */
+
 #include "danp/danp.h"
 #include "unity.h"
 
-// Forward declare mock init
-void mockDriverInit(uint16_t nodeId);
+/* ============================================================================
+ * External Function Declarations
+ * ============================================================================
+ */
 
-#define TEST_NODE_ID 10
-#define PORT_A 20
-#define PORT_B 21
+/**
+ * @brief Initialize the mock driver for testing
+ * @param node_id The local node ID for loopback operation
+ */
+void mockDriverInit(uint16_t node_id);
 
+/* ============================================================================
+ * Test Configuration
+ * ============================================================================
+ */
+
+/* Test node and port identifiers */
+#define TEST_NODE_ID 10  /* Local node ID for all tests */
+#define PORT_A 20        /* First test port */
+#define PORT_B 21        /* Second test port */
+
+/* ============================================================================
+ * Test Setup and Teardown
+ * ============================================================================
+ */
+
+/**
+ * @brief Setup function called before each test
+ *
+ * Initializes the DANP core and mock driver for loopback testing.
+ * The mock driver simulates a network by looping back packets sent
+ * to the local node.
+ */
 void setUp(void)
 {
-    // 1. Init Core
-    danpConfig_t cfg = {.localNode = TEST_NODE_ID};
-    danpInit(&cfg);
+    /* Initialize DANP core with test node ID */
+    danpConfig_t config = {.localNode = TEST_NODE_ID};
+    danpInit(&config);
 
-    // 2. Init Mock Driver (Loopback mode)
-    // Any packet sent to TEST_NODE_ID will be fed back to RX
+    /* Initialize mock driver in loopback mode */
     mockDriverInit(TEST_NODE_ID);
 }
 
+/**
+ * @brief Teardown function called after each test
+ */
 void tearDown(void)
 {
+    /* No cleanup needed for current tests */
 }
 
-void testDgramSendRecvSameNode(void)
+/* ============================================================================
+ * DGRAM Socket Tests
+ * ============================================================================
+ */
+
+/**
+ * @brief Test basic datagram send/receive on same node via loopback
+ *
+ * Scenario:
+ * 1. Create two sockets (A and B) bound to different ports
+ * 2. Socket A sends a message to socket B
+ * 3. Socket B receives the message
+ * 4. Verify message content and sender information
+ */
+void test_dgram_send_recv_same_node(void)
 {
-    // Scenario: Socket A sends to Socket B (both on same node via loopback)
+    /* Create and bind socket A */
+    danpSocket_t *socket_a = danpSocket(DANP_TYPE_DGRAM);
+    danpBind(socket_a, PORT_A);
 
-    // 1. Create Sockets
-    danpSocket_t *sockA = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(sockA, PORT_A);
+    /* Create and bind socket B */
+    danpSocket_t *socket_b = danpSocket(DANP_TYPE_DGRAM);
+    danpBind(socket_b, PORT_B);
 
-    danpSocket_t *sockB = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(sockB, PORT_B);
+    /* Send message from socket A to socket B */
+    const char *message = "HelloUnity";
+    int32_t bytes_sent = danpSendTo(socket_a, (void *)message, 10, TEST_NODE_ID, PORT_B);
+    TEST_ASSERT_EQUAL(10, bytes_sent);
 
-    // 2. Send A -> B
-    const char *msg = "HelloUnity";
-    int32_t sent = danpSendTo(sockA, (void *)msg, 10, TEST_NODE_ID, PORT_B);
-    TEST_ASSERT_EQUAL(10, sent);
-
-    // 3. Receive at B
+    /* Receive message at socket B */
     char buffer[32];
-    uint16_t srcNode, srcPort;
-    // We expect immediate availability because Mock Driver is synchronous
-    int32_t received = danpRecvFrom(sockB, buffer, 32, &srcNode, &srcPort, DANP_WAIT_FOREVER);
+    uint16_t source_node, source_port;
 
-    TEST_ASSERT_EQUAL(10, received);
-    buffer[received] = '\0';
+    /* Note: Mock driver is synchronous, so message is immediately available */
+    int32_t bytes_received = danpRecvFrom(
+        socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
+
+    /* Verify received data matches sent data */
+    TEST_ASSERT_EQUAL(10, bytes_received);
+    buffer[bytes_received] = '\0';
     TEST_ASSERT_EQUAL_STRING("HelloUnity", buffer);
 
-    // Verify Sender Info
-    TEST_ASSERT_EQUAL(TEST_NODE_ID, srcNode);
-    TEST_ASSERT_EQUAL(PORT_A, srcPort);
+    /* Verify sender information is correct */
+    TEST_ASSERT_EQUAL(TEST_NODE_ID, source_node);
+    TEST_ASSERT_EQUAL(PORT_A, source_port);
 
-    // Cleanup
-    danpClose(sockA);
-    danpClose(sockB);
+    /* Cleanup sockets */
+    danpClose(socket_a);
+    danpClose(socket_b);
 }
 
-void testDgramMultipleMessages(void)
+/**
+ * @brief Test sending and receiving multiple messages in sequence
+ *
+ * This test verifies that the socket can handle multiple messages
+ * queued up for reception without losing data or corrupting messages.
+ */
+void test_dgram_multiple_messages(void)
 {
-    // Test sending multiple messages in sequence
+    /* Create and bind sockets */
+    danpSocket_t *socket_a = danpSocket(DANP_TYPE_DGRAM);
+    danpBind(socket_a, PORT_A);
 
-    danpSocket_t *sockA = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(sockA, PORT_A);
+    danpSocket_t *socket_b = danpSocket(DANP_TYPE_DGRAM);
+    danpBind(socket_b, PORT_B);
 
-    danpSocket_t *sockB = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(sockB, PORT_B);
+    /* Send three different messages in sequence */
+    const char *message_1 = "First";
+    const char *message_2 = "Second";
+    const char *message_3 = "Third";
 
-    // Send multiple messages
-    const char *msg1 = "First";
-    const char *msg2 = "Second";
-    const char *msg3 = "Third";
+    danpSendTo(socket_a, (void *)message_1, 5, TEST_NODE_ID, PORT_B);
+    danpSendTo(socket_a, (void *)message_2, 6, TEST_NODE_ID, PORT_B);
+    danpSendTo(socket_a, (void *)message_3, 5, TEST_NODE_ID, PORT_B);
 
-    danpSendTo(sockA, (void *)msg1, 5, TEST_NODE_ID, PORT_B);
-    danpSendTo(sockA, (void *)msg2, 6, TEST_NODE_ID, PORT_B);
-    danpSendTo(sockA, (void *)msg3, 5, TEST_NODE_ID, PORT_B);
-
-    // Receive all messages
+    /* Receive and verify all three messages */
     char buffer[32];
-    uint16_t srcNode, srcPort;
+    uint16_t source_node, source_port;
 
-    int32_t r1 = danpRecvFrom(sockB, buffer, 32, &srcNode, &srcPort, DANP_WAIT_FOREVER);
-    TEST_ASSERT_EQUAL(5, r1);
-    buffer[r1] = '\0';
+    /* Receive first message */
+    int32_t received_1 = danpRecvFrom(
+        socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(5, received_1);
+    buffer[received_1] = '\0';
     TEST_ASSERT_EQUAL_STRING("First", buffer);
 
-    int32_t r2 = danpRecvFrom(sockB, buffer, 32, &srcNode, &srcPort, DANP_WAIT_FOREVER);
-    TEST_ASSERT_EQUAL(6, r2);
-    buffer[r2] = '\0';
+    /* Receive second message */
+    int32_t received_2 = danpRecvFrom(
+        socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(6, received_2);
+    buffer[received_2] = '\0';
     TEST_ASSERT_EQUAL_STRING("Second", buffer);
 
-    int32_t r3 = danpRecvFrom(sockB, buffer, 32, &srcNode, &srcPort, DANP_WAIT_FOREVER);
-    TEST_ASSERT_EQUAL(5, r3);
-    buffer[r3] = '\0';
+    /* Receive third message */
+    int32_t received_3 = danpRecvFrom(
+        socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(5, received_3);
+    buffer[received_3] = '\0';
     TEST_ASSERT_EQUAL_STRING("Third", buffer);
 
-    danpClose(sockA);
-    danpClose(sockB);
+    /* Cleanup sockets */
+    danpClose(socket_a);
+    danpClose(socket_b);
 }
 
-void testDgramSocketCreationAndBinding(void)
+/**
+ * @brief Test socket creation and port binding
+ *
+ * This test verifies:
+ * 1. Socket can be created with DGRAM type
+ * 2. Socket starts in OPEN state
+ * 3. Socket can be bound to a specific port
+ * 4. Port binding updates socket's local port field
+ */
+void test_dgram_socket_creation_and_binding(void)
 {
-    // Test basic socket creation and binding
+    /* Create a datagram socket */
+    danpSocket_t *socket = danpSocket(DANP_TYPE_DGRAM);
 
-    danpSocket_t *sock = danpSocket(DANP_TYPE_DGRAM);
-    TEST_ASSERT_NOT_NULL(sock);
-    TEST_ASSERT_EQUAL(DANP_TYPE_DGRAM, sock->type);
-    TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, sock->state);
+    /* Verify socket was created successfully */
+    TEST_ASSERT_NOT_NULL(socket);
+    TEST_ASSERT_EQUAL(DANP_TYPE_DGRAM, socket->type);
+    TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, socket->state);
 
-    // Bind to a port
-    int32_t bindResult = danpBind(sock, 100);
-    TEST_ASSERT_EQUAL(0, bindResult);
-    TEST_ASSERT_EQUAL_UINT16(100, sock->localPort);
+    /* Bind socket to a specific port */
+    int32_t bind_result = danpBind(socket, 100);
 
-    danpClose(sock);
+    /* Verify binding succeeded and port was set */
+    TEST_ASSERT_EQUAL(0, bind_result);
+    TEST_ASSERT_EQUAL_UINT16(100, socket->localPort);
+
+    /* Cleanup */
+    danpClose(socket);
 }
 
+/* ============================================================================
+ * Test Runner
+ * ============================================================================
+ */
+
+/**
+ * @brief Main test runner
+ *
+ * Executes all DGRAM socket tests in sequence
+ */
 int main(void)
 {
     UNITY_BEGIN();
-    RUN_TEST(testDgramSendRecvSameNode);
-    RUN_TEST(testDgramMultipleMessages);
-    RUN_TEST(testDgramSocketCreationAndBinding);
+
+    /* Run all DGRAM socket tests */
+    RUN_TEST(test_dgram_send_recv_same_node);
+    RUN_TEST(test_dgram_multiple_messages);
+    RUN_TEST(test_dgram_socket_creation_and_binding);
+
     return UNITY_END();
 }
