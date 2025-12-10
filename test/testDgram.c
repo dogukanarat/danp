@@ -52,11 +52,76 @@ void testDgramSendRecvSameNode(void)
     // Verify Sender Info
     TEST_ASSERT_EQUAL(TEST_NODE_ID, srcNode);
     TEST_ASSERT_EQUAL(PORT_A, srcPort);
+
+    // Cleanup
+    danpClose(sockA);
+    danpClose(sockB);
+}
+
+void testDgramMultipleMessages(void)
+{
+    // Test sending multiple messages in sequence
+
+    danpSocket_t *sockA = danpSocket(DANP_TYPE_DGRAM);
+    danpBind(sockA, PORT_A);
+
+    danpSocket_t *sockB = danpSocket(DANP_TYPE_DGRAM);
+    danpBind(sockB, PORT_B);
+
+    // Send multiple messages
+    const char *msg1 = "First";
+    const char *msg2 = "Second";
+    const char *msg3 = "Third";
+
+    danpSendTo(sockA, (void *)msg1, 5, TEST_NODE_ID, PORT_B);
+    danpSendTo(sockA, (void *)msg2, 6, TEST_NODE_ID, PORT_B);
+    danpSendTo(sockA, (void *)msg3, 5, TEST_NODE_ID, PORT_B);
+
+    // Receive all messages
+    char buffer[32];
+    uint16_t srcNode, srcPort;
+
+    int32_t r1 = danpRecvFrom(sockB, buffer, 32, &srcNode, &srcPort, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(5, r1);
+    buffer[r1] = '\0';
+    TEST_ASSERT_EQUAL_STRING("First", buffer);
+
+    int32_t r2 = danpRecvFrom(sockB, buffer, 32, &srcNode, &srcPort, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(6, r2);
+    buffer[r2] = '\0';
+    TEST_ASSERT_EQUAL_STRING("Second", buffer);
+
+    int32_t r3 = danpRecvFrom(sockB, buffer, 32, &srcNode, &srcPort, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(5, r3);
+    buffer[r3] = '\0';
+    TEST_ASSERT_EQUAL_STRING("Third", buffer);
+
+    danpClose(sockA);
+    danpClose(sockB);
+}
+
+void testDgramSocketCreationAndBinding(void)
+{
+    // Test basic socket creation and binding
+
+    danpSocket_t *sock = danpSocket(DANP_TYPE_DGRAM);
+    TEST_ASSERT_NOT_NULL(sock);
+    TEST_ASSERT_EQUAL(DANP_TYPE_DGRAM, sock->type);
+    TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, sock->state);
+
+    // Bind to a port
+    int32_t bindResult = danpBind(sock, 100);
+    TEST_ASSERT_EQUAL(0, bindResult);
+    TEST_ASSERT_EQUAL_UINT16(100, sock->localPort);
+
+    danpClose(sock);
 }
 
 int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(testDgramSendRecvSameNode);
+    RUN_TEST(testDgramMultipleMessages);
+    RUN_TEST(testDgramSocketCreationAndBinding);
     return UNITY_END();
 }

@@ -19,6 +19,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(BUILD_TESTS "Build test suite" OFF)
 option(BUILD_EXAMPLES "Build example applications" OFF)
 option(INSTALL_DOCS "Install documentation" ON)
+option(ENABLE_COVERAGE "Enable code coverage analysis" OFF)
 
 # ============================================================================
 # CMake Settings
@@ -27,6 +28,20 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
 # Export compile commands for IDE integration
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ============================================================================
+# Code Coverage Configuration
+# ============================================================================
+if(ENABLE_COVERAGE AND NOT BUILD_TESTS)
+    message(WARNING "Code coverage enabled but BUILD_TESTS is OFF. Enabling BUILD_TESTS automatically.")
+    set(BUILD_TESTS ON CACHE BOOL "Build test suite" FORCE)
+endif()
+
+if(ENABLE_COVERAGE)
+    include(CodeCoverage)
+    append_coverage_compiler_flags()
+    message(STATUS "Code coverage analysis enabled")
+endif()
 
 # ============================================================================
 # Dependencies

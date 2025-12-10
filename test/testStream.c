@@ -90,6 +90,72 @@ void testStreamCloseTriggersRst(void)
     // So acceptedSock should be CLOSED immediately.
 
     TEST_ASSERT_EQUAL(DANP_SOCK_CLOSED, acceptedSock->state);
+
+    // Cleanup
+    danpClose(serverSock);
+}
+
+void testStreamSocketCreationAndStates(void)
+{
+    // Test socket creation and state transitions
+
+    danpSocket_t *sock = danpSocket(DANP_TYPE_STREAM);
+    TEST_ASSERT_NOT_NULL(sock);
+    TEST_ASSERT_EQUAL(DANP_TYPE_STREAM, sock->type);
+    TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, sock->state);
+
+    // Bind to port
+    int32_t bindRes = danpBind(sock, 99);
+    TEST_ASSERT_EQUAL(0, bindRes);
+    TEST_ASSERT_EQUAL_UINT16(99, sock->localPort);
+
+    // Listen
+    int32_t listenRes = danpListen(sock, 5);
+    TEST_ASSERT_EQUAL(0, listenRes);
+    TEST_ASSERT_EQUAL(DANP_SOCK_LISTENING, sock->state);
+
+    danpClose(sock);
+}
+
+void testStreamBidirectionalCommunication(void)
+{
+    // Test bidirectional data transfer
+
+    danpSocket_t *serverSock = danpSocket(DANP_TYPE_STREAM);
+    danpBind(serverSock, 14);
+    danpListen(serverSock, 5);
+
+    danpSocket_t *clientSock = danpSocket(DANP_TYPE_STREAM);
+    danpBind(clientSock, 15);
+    danpConnect(clientSock, TEST_NODE_ID, 14);
+
+    danpSocket_t *acceptedSock = danpAccept(serverSock, DANP_WAIT_FOREVER);
+    TEST_ASSERT_NOT_NULL(acceptedSock);
+
+    // Client sends to server
+    const char *clientMsg = "ClientData";
+    int32_t sent1 = danpSend(clientSock, (void *)clientMsg, 10);
+    TEST_ASSERT_EQUAL(10, sent1);
+
+    char buffer1[32];
+    int32_t recv1 = danpRecv(acceptedSock, buffer1, 32, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(10, recv1);
+    buffer1[recv1] = '\0';
+    TEST_ASSERT_EQUAL_STRING("ClientData", buffer1);
+
+    // Server sends to client
+    const char *serverMsg = "ServerData";
+    int32_t sent2 = danpSend(acceptedSock, (void *)serverMsg, 10);
+    TEST_ASSERT_EQUAL(10, sent2);
+
+    char buffer2[32];
+    int32_t recv2 = danpRecv(clientSock, buffer2, 32, DANP_WAIT_FOREVER);
+    TEST_ASSERT_EQUAL(10, recv2);
+    buffer2[recv2] = '\0';
+    TEST_ASSERT_EQUAL_STRING("ServerData", buffer2);
+
+    danpClose(clientSock);
+    danpClose(serverSock);
 }
 
 int main(void)
@@ -97,5 +163,7 @@ int main(void)
     UNITY_BEGIN();
     RUN_TEST(testStreamHandshakeAndDataTransfer);
     RUN_TEST(testStreamCloseTriggersRst);
+    RUN_TEST(testStreamSocketCreationAndStates);
+    RUN_TEST(testStreamBidirectionalCommunication);
     return UNITY_END();
 }

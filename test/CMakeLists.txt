@@ -63,6 +63,29 @@ danp_add_test(test_dgram SOURCE testDgram.c)
 danp_add_test(test_stream SOURCE testStream.c)
 
 # ============================================================================
+# Code Coverage Target
+# ============================================================================
+if(ENABLE_COVERAGE)
+    include(CodeCoverage)
+
+    # Setup coverage target that runs all tests
+    setup_target_for_coverage_lcov(
+        NAME coverage
+        EXECUTABLE ctest
+        EXECUTABLE_ARGS --output-on-failure
+        DEPENDENCIES test_core test_dgram test_stream
+        EXCLUDE
+            'test/*'
+            'unity/*'
+            '*/mockDriver.c'
+            '*/logMessage.c'
+    )
+
+    message(STATUS "Coverage target 'coverage' configured")
+    message(STATUS "Run 'cmake --build . --target coverage' to generate coverage report")
+endif()
+
+# ============================================================================
 # Test Summary
 # ============================================================================
 message(STATUS "Test suite configured:")
