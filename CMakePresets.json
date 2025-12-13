@@ -31,6 +31,16 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "Coverage",
+            "displayName": "Coverage",
+            "inherits": [ "Default" ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_TESTS": "ON",
+                "ENABLE_COVERAGE": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -43,6 +53,11 @@
             "name": "Release",
             "displayName": "Release Build",
             "configurePreset": "Release"
+        },
+        {
+            "name": "Coverage",
+            "displayName": "Coverage Build",
+            "configurePreset": "Coverage"
         }
     ]
 }

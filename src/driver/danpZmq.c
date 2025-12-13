@@ -27,16 +27,12 @@
 /* Variables */
 
 static void *ZmqContext = NULL;
-static void *PubSock = NULL;
-static void *SubSock = NULL;
-static danpInterface_t ZmqIface;
-static pthread_t RxThreadId;
 
 /* Functions */
 
-int32_t danpZmqTx(danpInterface_t *iface, danpPacket_t *packet)
+int32_t danpZmqTx(void *ifaceCommon, danpPacket_t *packet)
 {
-    UNUSED(iface);
+    danpZmqInterface_t *iface = (danpZmqInterface_t *)ifaceCommon;
     uint8_t buffer[DANP_MAX_PACKET_SIZE + 4];
     memcpy(buffer, &packet->headerRaw, 4);
     if (packet->length > 0)
@@ -59,19 +55,19 @@ int32_t danpZmqTx(danpInterface_t *iface, danpPacket_t *packet)
 
     // ZMQ Topic    // 1. Send Topic (2 bytes, NodeID)
     uint16_t topic = packet->headerRaw >> 22 & 0xFF; // Extract DST Node
-    zmq_send(PubSock, &topic, 2, ZMQ_SNDMORE);
-    zmq_send(PubSock, buffer, 4 + packet->length, 0);
+    zmq_send(iface->pubSock, &topic, 2, ZMQ_SNDMORE);
+    zmq_send(iface->pubSock, buffer, 4 + packet->length, 0);
     return 0;
 }
 
 void *zmqRxRoutine(void *arg)
 {
-    UNUSED(arg);
+    danpZmqInterface_t *iface = (danpZmqInterface_t *)arg;
     while (1)
     {
-        zmq_recv(SubSock, NULL, 0, 0);
+        zmq_recv(iface->subSock, NULL, 0, 0);
         uint8_t buffer[256];
-        int32_t len = zmq_recv(SubSock, buffer, sizeof(buffer), 0);
+        int32_t len = zmq_recv(iface->subSock, buffer, sizeof(buffer), 0);
         if (len >= 4)
         {
             uint32_t headerRaw;
@@ -83,12 +79,12 @@ void *zmqRxRoutine(void *arg)
 
             danpLogMessage(
                 DANP_LOG_VERBOSE,
-                "ZMQ RX: dst=%u port=%u flags=0x%02X len=%d",
+                "ZMQ RX: [dst]=%u, [port]=%u [flags]=0x%02X [len]=%d",
                 dst,
                 dPort,
                 flags,
                 len - 4);
-            danpInput(&ZmqIface, buffer, len);
+            danpInput(iface, buffer, len);
         }
         else
         {
@@ -99,37 +95,44 @@ void *zmqRxRoutine(void *arg)
 }
 
 void danpZmqInit(
+    danpZmqInterface_t *iface,
     const char *pubBindEndpoint,
     const char **subConnectEndpoints,
     int32_t subCount,
     uint16_t nodeId)
 {
-    ZmqContext = zmq_ctx_new();
+    if (ZmqContext == NULL)
+    {
+        ZmqContext = zmq_ctx_new();
+        if (ZmqContext == NULL)
+        {
+            danpLogMessage(DANP_LOG_ERROR, "Failed to create ZMQ context");
+            return;
+        }
+    }
 
     // PUB
-    PubSock = zmq_socket(ZmqContext, ZMQ_PUB);
-    zmq_bind(PubSock, pubBindEndpoint);
+    iface->pubSock = zmq_socket(ZmqContext, ZMQ_PUB);
+    zmq_bind(iface->pubSock, pubBindEndpoint);
 
     // SUB
-    SubSock = zmq_socket(ZmqContext, ZMQ_SUB);
+    iface->subSock = zmq_socket(ZmqContext, ZMQ_SUB);
     for (int i = 0; i < subCount; i++)
     {
-        zmq_connect(SubSock, subConnectEndpoints[i]);
+        zmq_connect(iface->subSock, subConnectEndpoints[i]);
     }
 
     // Filter: Subscribe to My Node ID
     uint16_t topic = nodeId;
-    zmq_setsockopt(SubSock, ZMQ_SUBSCRIBE, &topic, 2);
+    zmq_setsockopt(iface->subSock, ZMQ_SUBSCRIBE, &topic, 2);
 
     // Also subscribe to Broadcast (0xFF) if needed, or Promiscuous mode
     // For now, just specific node.
 
-    ZmqIface.name = "ZMQ";
-    ZmqIface.address = nodeId;
-    ZmqIface.mtu = DANP_MAX_PACKET_SIZE;
-    ZmqIface.txFunc = danpZmqTx;
+    iface->common.name = "ZMQ";
+    iface->common.address = nodeId;
+    iface->common.mtu = DANP_MAX_PACKET_SIZE;
+    iface->common.txFunc = danpZmqTx;
 
-    danpRegisterInterface(&ZmqIface);
-
-    pthread_create(&RxThreadId, NULL, zmqRxRoutine, NULL);
+    pthread_create(&iface->rxThreadId, NULL, zmqRxRoutine, iface);
 }
