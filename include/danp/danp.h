@@ -12,7 +12,7 @@ extern "C"
 
 /* Includes */
 
-#include "danp/danpTypes.h"
+#include "danp/danp_types.h"
 #include "osal/osal.h"
 #include <stdarg.h>
 #include <stdbool.h>
@@ -67,39 +67,39 @@ extern "C"
 /**
  * @brief Packet flags for control and state.
  */
-typedef enum danpPacketFlags_e
+typedef enum danp_packet_flags_e
 {
     DANP_FLAG_NONE = 0x00, /**< No flags set. */
     DANP_FLAG_SYN = 0x01,  /**< Connection Request. */
     DANP_FLAG_ACK = 0x02,  /**< Acknowledge (used for both Connect and Data). */
     DANP_FLAG_RST = 0x04   /**< Reset Connection. */
-} danpPacketFlags_t;
+} danp_packet_flags_t;
 
 /**
  * @brief Log levels for the library.
  */
-typedef enum danpLogLevel_e
+typedef enum danp_log_level_e
 {
     DANP_LOG_VERBOSE = 0, /**< Verbose logging. */
     DANP_LOG_DEBUG,       /**< Debug logging. */
     DANP_LOG_INFO,        /**< Informational logging. */
     DANP_LOG_WARN,        /**< Warning logging. */
     DANP_LOG_ERROR        /**< Error logging. */
-} danpLogLevel_t;
+} danp_log_level_t;
 
 /**
  * @brief Socket types.
  */
-typedef enum danpSocketType_e
+typedef enum danp_socket_type_e
 {
     DANP_TYPE_DGRAM = 0, /**< Unreliable (UDP-like). */
     DANP_TYPE_STREAM = 1 /**< Reliable (RDP/TCP-like). */
-} danpSocketType_t;
+} danp_socket_type_t;
 
 /**
  * @brief Socket states.
  */
-typedef enum danpSocketState_e
+typedef enum danp_socket_state_e
 {
     DANP_SOCK_CLOSED,    /**< Socket is unused or closed. */
     DANP_SOCK_OPEN,      /**< Socket is allocated and bound, but not connected (DGRAM default). */
@@ -107,58 +107,58 @@ typedef enum danpSocketState_e
     DANP_SOCK_SYN_SENT,  /**< Connection initiated, waiting for SYN-ACK (STREAM). */
     DANP_SOCK_SYN_RECEIVED, /**< SYN received, waiting for final ACK (STREAM). */
     DANP_SOCK_ESTABLISHED   /**< Connection established (STREAM) or Default Peer Set (DGRAM). */
-} danpSocketState_t;
+} danp_socket_state_t;
 
 /** @brief Handle for an OS queue. */
-typedef osalMessageQueueHandle_t danpOsQueueHandle_t;
+typedef osalMessageQueueHandle_t danp_os_queue_handle_t;
 
 /** @brief Handle for an OS semaphore. */
-typedef osalSemaphoreHandle_t danpOsSemaphoreHandle_t;
+typedef osalSemaphoreHandle_t danp_os_semaphore_handle_t;
 
 /* Header Packing Details (omitted for brevity) */
 
 /**
  * @brief Structure representing a DANP packet.
  */
-typedef struct danpPacket_e
+typedef struct danp_packet_s
 {
-    uint32_t headerRaw;                    /**< Raw header data. */
+    uint32_t header_raw;                    /**< Raw header data. */
     uint8_t payload[DANP_MAX_PACKET_SIZE]; /**< Payload data. */
 
     uint16_t length;                       /**< Length of the payload. */
-    struct danpInterface_s *rxInterface;   /**< Interface where the packet was received. */
-} danpPacket_t;
+    struct danp_interface_s *rx_interface;   /**< Interface where the packet was received. */
+} danp_packet_t;
 
 /**
  * @brief Structure representing a DANP socket.
  */
-typedef struct danpSocket_s
+typedef struct danp_socket_s
 {
-    danpSocketState_t state; /**< Current state of the socket. */
-    danpSocketType_t type;   /**< Type of the socket. */
+    danp_socket_state_t state; /**< Current state of the socket. */
+    danp_socket_type_t type;   /**< Type of the socket. */
 
     // Addressing
-    uint16_t localPort;  /**< Local port number. */
-    uint16_t localNode;  /**< Local node address. */
-    uint16_t remoteNode; /**< Remote node address. */
-    uint16_t remotePort; /**< Remote port number. */
+    uint16_t local_port;  /**< Local port number. */
+    uint16_t local_node;  /**< Local node address. */
+    uint16_t remote_node; /**< Remote node address. */
+    uint16_t remote_port; /**< Remote port number. */
 
     // Reliability State (Stop-and-Wait)
-    uint8_t txSeq;         /**< Transmit sequence number. */
-    uint8_t rxExpectedSeq; /**< Expected receive sequence number. */
+    uint8_t tx_seq;         /**< Transmit sequence number. */
+    uint8_t rx_expected_seq; /**< Expected receive sequence number. */
 
     // RTOS Handles
-    danpOsQueueHandle_t rxQueue;     /**< Queue for received packets. */
-    danpOsQueueHandle_t acceptQueue; /**< Queue for accepted connections. */
-    danpOsSemaphoreHandle_t signal;  /**< Semaphore for signaling. */
+    danp_os_queue_handle_t rx_queue;     /**< Queue for received packets. */
+    danp_os_queue_handle_t accept_queue; /**< Queue for accepted connections. */
+    danp_os_semaphore_handle_t signal;  /**< Semaphore for signaling. */
 
-    struct danpSocket_s *next; /**< Pointer to the next socket in the list. */
-} danpSocket_t;
+    struct danp_socket_s *next; /**< Pointer to the next socket in the list. */
+} danp_socket_t;
 
 /**
  * @brief Structure representing a network interface.
  */
-typedef struct danpInterface_s
+typedef struct danp_interface_s
 {
     const char *name; /**< Name of the interface. */
     uint16_t address; /**< Address of the interface. */
@@ -170,32 +170,32 @@ typedef struct danpInterface_s
      * @param packet Pointer to the packet to transmit.
      * @return 0 on success, negative on error.
      */
-    int32_t (*txFunc)(void *ifaceCommon, danpPacket_t *packet);
+    int32_t (*tx_func)(void *iface_common, danp_packet_t *packet);
 
-    struct danpInterface_s *next; /**< Pointer to the next interface in the list. */
-} danpInterface_t;
+    struct danp_interface_s *next; /**< Pointer to the next interface in the list. */
+} danp_interface_t;
 
 /**
  * @brief Callback function type for logging.
  * @param level Log level.
- * @param funcName Name of the function generating the log.
+ * @param func_name Name of the function generating the log.
  * @param message Log message format string.
  * @param args Variable arguments list.
  */
-typedef void (*danpLogFunctionCallback)(
-    danpLogLevel_t level,
-    const char *funcName,
+typedef void (*danp_log_function_callback)(
+    danp_log_level_t level,
+    const char *func_name,
     const char *message,
     va_list args);
 
 /**
  * @brief Configuration structure for DANP initialization.
  */
-typedef struct danpConfig_s
+typedef struct danp_config_s
 {
-    uint16_t localNode;                  /**< Local node address. */
-    danpLogFunctionCallback logFunction; /**< Logging callback function. */
-} danpConfig_t;
+    uint16_t local_node;                  /**< Local node address. */
+    danp_log_function_callback log_function; /**< Logging callback function. */
+} danp_config_t;
 
 /* External Declarations */
 
@@ -205,58 +205,58 @@ typedef struct danpConfig_s
  * @brief Initialize the DANP library.
  * @param config Pointer to the configuration structure.
  */
-void danpInit(const danpConfig_t *config);
+void danp_init(const danp_config_t *config);
 
 /**
  * @brief Pack a DANP header.
  * @param priority Packet priority.
- * @param dstNode Destination node address.
- * @param srcNode Source node address.
- * @param dstPort Destination port.
- * @param srcPort Source port.
+ * @param dst_node Destination node address.
+ * @param src_node Source node address.
+ * @param dst_port Destination port.
+ * @param src_port Source port.
  * @param flags Packet flags.
  * @return Packed header as a 32-bit integer.
  */
-uint32_t danpPackHeader(
+uint32_t danp_pack_header(
     uint8_t priority,
-    uint16_t dstNode,
-    uint16_t srcNode,
-    uint8_t dstPort,
-    uint8_t srcPort,
+    uint16_t dst_node,
+    uint16_t src_node,
+    uint8_t dst_port,
+    uint8_t src_port,
     uint8_t flags);
 
 /**
  * @brief Unpack a DANP header.
  * @param raw Raw 32-bit header.
- * @param dstNode Pointer to store destination node address.
- * @param srcNode Pointer to store source node address.
- * @param dstPort Pointer to store destination port.
- * @param srcPort Pointer to store source port.
+ * @param dst_node Pointer to store destination node address.
+ * @param src_node Pointer to store source node address.
+ * @param dst_port Pointer to store destination port.
+ * @param src_port Pointer to store source port.
  * @param flags Pointer to store packet flags.
  */
-void danpUnpackHeader(
+void danp_unpack_header(
     uint32_t raw,
-    uint16_t *dstNode,
-    uint16_t *srcNode,
-    uint8_t *dstPort,
-    uint8_t *srcPort,
+    uint16_t *dst_node,
+    uint16_t *src_node,
+    uint8_t *dst_port,
+    uint8_t *src_port,
     uint8_t *flags);
 
 /**
  * @brief Log a message using the registered callback.
  * @param level Log level.
- * @param funcName Name of the function.
+ * @param func_name Name of the function.
  * @param message Message format string.
  * @param ... Variable arguments.
  */
-void danpLogMessage(danpLogLevel_t level, const char *funcName, const char *message, ...);
+void danp_log_message(danp_log_level_t level, const char *func_name, const char *message, ...);
 
 /**
  * @brief Route a packet for transmission.
  * @param packet Pointer to the packet to route.
  * @return 0 on success, negative on error.
  */
-int32_t danpRouteTx(danpPacket_t *packet);
+int32_t danp_route_tx(danp_packet_t *packet);
 
 /**
  * @brief Process incoming data from an interface.
@@ -264,25 +264,25 @@ int32_t danpRouteTx(danpPacket_t *packet);
  * @param data Pointer to the received data.
  * @param length Length of the received data.
  */
-void danpInput(danpInterface_t *iface, uint8_t *data, uint16_t length);
+void danp_input(danp_interface_t *iface, uint8_t *data, uint16_t length);
 
 /**
  * @brief Allocate a packet from the pool.
  * @return Pointer to the allocated packet, or NULL if pool is empty.
  */
-danpPacket_t *danpBufferAllocate(void);
+danp_packet_t *danp_buffer_allocate(void);
 
 /**
  * @brief Free a packet back to the pool.
  * @param packet Pointer to the packet to free.
  */
-void danpBufferFree(danpPacket_t *packet);
+void danp_buffer_free(danp_packet_t *packet);
 
 /**
  * @brief Register a network interface.
  * @param iface Pointer to the interface to register.
  */
-void danpRegisterInterface(void *iface);
+void danp_register_interface(void *iface);
 
 // Socket API
 
@@ -290,14 +290,14 @@ void danpRegisterInterface(void *iface);
  * @brief Initialize the socket subsystem.
  * @return int32_t
  */
-int32_t danpSocketInit(void);
+int32_t danp_socket_init(void);
 
 /**
  * @brief Create a new DANP socket.
  * @param type Type of the socket (DGRAM or STREAM).
  * @return Pointer to the created socket, or NULL on failure.
  */
-danpSocket_t *danpSocket(danpSocketType_t type);
+danp_socket_t *danp_socket(danp_socket_type_t type);
 
 /**
  * @brief Bind a socket to a local port.
@@ -305,7 +305,7 @@ danpSocket_t *danpSocket(danpSocketType_t type);
  * @param port Local port to bind to.
  * @return 0 on success, negative on error.
  */
-int32_t danpBind(danpSocket_t *sock, uint16_t port);
+int32_t danp_bind(danp_socket_t *sock, uint16_t port);
 
 /**
  * @brief Listen for incoming connections on a socket.
@@ -313,24 +313,24 @@ int32_t danpBind(danpSocket_t *sock, uint16_t port);
  * @param backlog Maximum number of pending connections (currently unused).
  * @return 0 on success, negative on error.
  */
-int32_t danpListen(danpSocket_t *sock, int backlog);
+int32_t danp_listen(danp_socket_t *sock, int backlog);
 
 /**
  * @brief Close a socket and release resources.
  * @param sock Pointer to the socket to close.
  * @return 0 on success, negative on error.
  */
-int32_t danpClose(danpSocket_t *sock); // Added close function
+int32_t danp_close(danp_socket_t *sock); // Added close function
 
-// Functions updated with timeoutMs
+// Functions updated with timeout_ms
 
 /**
  * @brief Accept a new connection on a listening socket.
- * @param serverSock Pointer to the listening socket.
- * @param timeoutMs Timeout in milliseconds.
+ * @param server_sock Pointer to the listening socket.
+ * @param timeout_ms Timeout in milliseconds.
  * @return Pointer to the new connected socket, or NULL on timeout/error.
  */
-danpSocket_t *danpAccept(danpSocket_t *serverSock, uint32_t timeoutMs);
+danp_socket_t *danp_accept(danp_socket_t *server_sock, uint32_t timeout_ms);
 
 /**
  * @brief Connect a socket to a remote node and port.
@@ -339,7 +339,7 @@ danpSocket_t *danpAccept(danpSocket_t *serverSock, uint32_t timeoutMs);
  * @param port Remote port number.
  * @return 0 on success, negative on error.
  */
-int32_t danpConnect(danpSocket_t *sock, uint16_t node, uint16_t port);
+int32_t danp_connect(danp_socket_t *sock, uint16_t node, uint16_t port);
 
 /**
  * @brief Send data over a connected socket.
@@ -348,49 +348,49 @@ int32_t danpConnect(danpSocket_t *sock, uint16_t node, uint16_t port);
  * @param len Length of the data.
  * @return Number of bytes sent, or negative on error.
  */
-int32_t danpSend(danpSocket_t *sock, void *data, uint16_t len);
+int32_t danp_send(danp_socket_t *sock, void *data, uint16_t len);
 
 /**
  * @brief Receive data from a connected socket.
  * @param sock Pointer to the socket.
  * @param buffer Pointer to the buffer to store received data.
- * @param maxLen Maximum length of the buffer.
- * @param timeoutMs Timeout in milliseconds.
+ * @param max_len Maximum length of the buffer.
+ * @param timeout_ms Timeout in milliseconds.
  * @return Number of bytes received, or negative on error/timeout.
  */
-int32_t danpRecv(danpSocket_t *sock, void *buffer, uint16_t maxLen, uint32_t timeoutMs);
+int32_t danp_recv(danp_socket_t *sock, void *buffer, uint16_t max_len, uint32_t timeout_ms);
 
 /**
  * @brief Send data to a specific destination (for DGRAM sockets).
  * @param sock Pointer to the socket.
  * @param data Pointer to the data to send.
  * @param len Length of the data.
- * @param dstNode Destination node address.
- * @param dstPort Destination port number.
+ * @param dst_node Destination node address.
+ * @param dst_port Destination port number.
  * @return Number of bytes sent, or negative on error.
  */
-int32_t danpSendTo(danpSocket_t *sock, void *data, uint16_t len, uint16_t dstNode, uint16_t dstPort);
+int32_t danp_send_to(danp_socket_t *sock, void *data, uint16_t len, uint16_t dst_node, uint16_t dst_port);
 
 /**
  * @brief Receive data from any source (for DGRAM sockets).
  * @param sock Pointer to the socket.
  * @param buffer Pointer to the buffer to store received data.
- * @param maxLen Maximum length of the buffer.
- * @param srcNode Pointer to store the source node address.
- * @param srcPort Pointer to store the source port number.
- * @param timeoutMs Timeout in milliseconds.
+ * @param max_len Maximum length of the buffer.
+ * @param src_node Pointer to store the source node address.
+ * @param src_port Pointer to store the source port number.
+ * @param timeout_ms Timeout in milliseconds.
  * @return Number of bytes received, or negative on error/timeout.
  */
-int32_t danpRecvFrom(
-    danpSocket_t *sock,
+int32_t danp_recv_from(
+    danp_socket_t *sock,
     void *buffer,
-    uint16_t maxLen,
-    uint16_t *srcNode,
-    uint16_t *srcPort,
-    uint32_t timeoutMs);
+    uint16_t max_len,
+    uint16_t *src_node,
+    uint16_t *src_port,
+    uint32_t timeout_ms);
 
 
-void danpPrintStats(void (*printFunc)(const char *fmt, ...));
+void danp_print_stats(void (*print_func)(const char *fmt, ...));
 
 #ifdef __cplusplus
 }

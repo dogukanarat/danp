@@ -25,10 +25,10 @@ extern "C" {
 
 /* External Declarations */
 
-extern int32_t danpBufferInit(void);
-extern danpPacket_t *danpBufferAllocate(void);
-extern void danpBufferFree(danpPacket_t *pkt);
-extern size_t danpBufferGetFreeCount(void);
+extern int32_t danp_buffer_init(void);
+extern danp_packet_t *danp_buffer_allocate(void);
+extern void danp_buffer_free(danp_packet_t *pkt);
+extern size_t danp_buffer_get_free_count(void);
 
 #ifdef __cplusplus
 }

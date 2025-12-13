@@ -26,12 +26,12 @@
 
 /* Variables */
 
-danpLogLevel_t LogSeverity = DANP_LOG_DEBUG;
+danp_log_level_t LogSeverity = DANP_LOG_DEBUG;
 
 /* Functions */
 
 void danpLogMessageCallback(
-    danpLogLevel_t level,
+    danp_log_level_t level,
     const char *funcName,
     const char *message,
     va_list args)

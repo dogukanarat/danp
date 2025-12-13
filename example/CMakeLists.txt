@@ -11,20 +11,20 @@ function(danp_add_example EXAMPLE_NAME)
         "ADDITIONAL_SOURCES"
         ${ARGN}
     )
-    
+
     # Create executable
     add_executable(${EXAMPLE_NAME}
         ${ARG_SOURCE}
         ${ARG_ADDITIONAL_SOURCES}
-        logMessage.c
+        example_log_message.c
     )
-    
+
     # Link against library
     target_link_libraries(${EXAMPLE_NAME}
         PRIVATE
             danp::danp
     )
-    
+
     # Set output name
     set_target_properties(${EXAMPLE_NAME} PROPERTIES
         OUTPUT_NAME ${EXAMPLE_NAME}

@@ -17,20 +17,20 @@
  * ============================================================================
  * These functions are internal to DANP but exposed for testing purposes
  */
-extern uint32_t danpPackHeader(
+extern uint32_t danp_pack_header(
     uint8_t prio,
     uint16_t dst,
     uint16_t src,
-    uint8_t dstPort,
-    uint8_t srcPort,
+    uint8_t dst_port,
+    uint8_t src_port,
     uint8_t flags);
 
-extern void danpUnpackHeader(
+extern void danp_unpack_header(
     uint32_t raw,
     uint16_t *dst,
     uint16_t *src,
-    uint8_t *dstPort,
-    uint8_t *srcPort,
+    uint8_t *dst_port,
+    uint8_t *src_port,
     uint8_t *flags);
 
 /* ============================================================================
@@ -45,8 +45,8 @@ extern void danpUnpackHeader(
  */
 void setUp(void)
 {
-    danpConfig_t cfg = {.localNode = 1};
-    danpInit(&cfg);
+    danp_config_t cfg = {.local_node = 1};
+    danp_init(&cfg);
 }
 
 /**
@@ -79,7 +79,7 @@ void test_header_packing_preserves_values(void)
     uint8_t flags_in = DANP_FLAG_SYN;
 
     /* Pack the header into raw 32-bit format */
-    uint32_t raw_header = danpPackHeader(
+    uint32_t raw_header = danp_pack_header(
         prio_in, dst_in, src_in, dst_port_in, src_port_in, flags_in);
 
     /* Prepare variables to receive unpacked values */
@@ -87,7 +87,7 @@ void test_header_packing_preserves_values(void)
     uint8_t dst_port_out, src_port_out, flags_out;
 
     /* Unpack the header back into individual fields */
-    danpUnpackHeader(raw_header, &dst_out, &src_out, &dst_port_out, &src_port_out, &flags_out);
+    danp_unpack_header(raw_header, &dst_out, &src_out, &dst_port_out, &src_port_out, &flags_out);
 
     /* Verify all fields match the original input values */
     TEST_ASSERT_EQUAL_UINT16(dst_in, dst_out);
@@ -108,11 +108,11 @@ void test_header_packing_preserves_values(void)
 void test_header_packing_handles_edge_cases(void)
 {
     /* Test Case 1: All fields set to minimum (zero) values */
-    uint32_t raw_header_1 = danpPackHeader(0, 0, 0, 0, 0, 0);
+    uint32_t raw_header_1 = danp_pack_header(0, 0, 0, 0, 0, 0);
     uint16_t dst_1, src_1;
     uint8_t dst_port_1, src_port_1, flags_1;
 
-    danpUnpackHeader(raw_header_1, &dst_1, &src_1, &dst_port_1, &src_port_1, &flags_1);
+    danp_unpack_header(raw_header_1, &dst_1, &src_1, &dst_port_1, &src_port_1, &flags_1);
 
     TEST_ASSERT_EQUAL_UINT16(0, dst_1);
     TEST_ASSERT_EQUAL_UINT16(0, src_1);
@@ -121,20 +121,20 @@ void test_header_packing_handles_edge_cases(void)
     TEST_ASSERT_EQUAL_UINT8(0, flags_1);
 
     /* Test Case 2: Normal priority with ACK flag */
-    uint32_t raw_header_2 = danpPackHeader(DANP_PRIORITY_NORMAL, 10, 20, 30, 40, DANP_FLAG_ACK);
+    uint32_t raw_header_2 = danp_pack_header(DANP_PRIORITY_NORMAL, 10, 20, 30, 40, DANP_FLAG_ACK);
     uint16_t dst_2, src_2;
     uint8_t dst_port_2, src_port_2, flags_2;
 
-    danpUnpackHeader(raw_header_2, &dst_2, &src_2, &dst_port_2, &src_port_2, &flags_2);
+    danp_unpack_header(raw_header_2, &dst_2, &src_2, &dst_port_2, &src_port_2, &flags_2);
 
     TEST_ASSERT_EQUAL_UINT8(DANP_FLAG_ACK, flags_2);
 
     /* Test Case 3: High priority with RST flag and larger node addresses */
-    uint32_t raw_header_3 = danpPackHeader(DANP_PRIORITY_HIGH, 100, 200, 5, 6, DANP_FLAG_RST);
+    uint32_t raw_header_3 = danp_pack_header(DANP_PRIORITY_HIGH, 100, 200, 5, 6, DANP_FLAG_RST);
     uint16_t dst_3, src_3;
     uint8_t dst_port_3, src_port_3, flags_3;
 
-    danpUnpackHeader(raw_header_3, &dst_3, &src_3, &dst_port_3, &src_port_3, &flags_3);
+    danp_unpack_header(raw_header_3, &dst_3, &src_3, &dst_port_3, &src_port_3, &flags_3);
 
     TEST_ASSERT_EQUAL_UINT16(100, dst_3);
     TEST_ASSERT_EQUAL_UINT16(200, src_3);
@@ -158,31 +158,31 @@ void test_header_packing_handles_edge_cases(void)
  */
 void test_memory_pool_allocates_until_exhaustion(void)
 {
-    danpPacket_t *packets[DANP_POOL_SIZE];
+    danp_packet_t *packets[DANP_POOL_SIZE];
 
     /* Step 1: Allocate all packets from the pool */
     for (int i = 0; i < DANP_POOL_SIZE; i++)
     {
-        packets[i] = danpAllocPacket();
+        packets[i] = danp_buffer_allocate();
         TEST_ASSERT_NOT_NULL(packets[i]);
     }
 
     /* Step 2: Attempt to allocate beyond pool capacity - should fail */
-    danpPacket_t *fail_packet = danpAllocPacket();
+    danp_packet_t *fail_packet = danp_buffer_allocate();
     TEST_ASSERT_NULL(fail_packet);
 
     /* Step 3: Free one packet to make room in the pool */
-    danpFreePacket(packets[0]);
+    danp_buffer_free(packets[0]);
 
     /* Step 4: Allocation should now succeed again */
-    danpPacket_t *retry_packet = danpAllocPacket();
+    danp_packet_t *retry_packet = danp_buffer_allocate();
     TEST_ASSERT_NOT_NULL(retry_packet);
 
     /* Cleanup: Free all remaining packets */
-    danpFreePacket(retry_packet);
+    danp_buffer_free(retry_packet);
     for (int i = 1; i < DANP_POOL_SIZE; i++)
     {
-        danpFreePacket(packets[i]);
+        danp_buffer_free(packets[i]);
     }
 }
 
@@ -195,8 +195,8 @@ void test_memory_pool_allocates_until_exhaustion(void)
 void test_packet_allocation_returns_different_packets(void)
 {
     /* Allocate two packets from the pool */
-    danpPacket_t *packet_1 = danpAllocPacket();
-    danpPacket_t *packet_2 = danpAllocPacket();
+    danp_packet_t *packet_1 = danp_buffer_allocate();
+    danp_packet_t *packet_2 = danp_buffer_allocate();
 
     /* Both allocations should succeed */
     TEST_ASSERT_NOT_NULL(packet_1);
@@ -206,8 +206,8 @@ void test_packet_allocation_returns_different_packets(void)
     TEST_ASSERT_NOT_EQUAL(packet_1, packet_2);
 
     /* Cleanup */
-    danpFreePacket(packet_1);
-    danpFreePacket(packet_2);
+    danp_buffer_free(packet_1);
+    danp_buffer_free(packet_2);
 }
 
 /* ============================================================================
@@ -224,16 +224,16 @@ void test_packet_allocation_returns_different_packets(void)
 void test_init_sets_local_node(void)
 {
     /* Initialize DANP with a specific local node address */
-    danpConfig_t config = {.localNode = 42, .logFunction = NULL};
-    danpInit(&config);
+    danp_config_t config = {.local_node = 42, .log_function = NULL};
+    danp_init(&config);
 
     /* Create a socket and verify it has the configured local node address */
-    danpSocket_t *socket = danpSocket(DANP_TYPE_DGRAM);
+    danp_socket_t *socket = danp_socket(DANP_TYPE_DGRAM);
     TEST_ASSERT_NOT_NULL(socket);
-    TEST_ASSERT_EQUAL_UINT16(42, socket->localNode);
+    TEST_ASSERT_EQUAL_UINT16(42, socket->local_node);
 
     /* Cleanup */
-    danpClose(socket);
+    danp_close(socket);
 }
 
 /* ============================================================================

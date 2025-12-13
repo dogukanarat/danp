@@ -4,9 +4,9 @@ if(CONFIG_DANP)
     # Add your DANP source files
     zephyr_library_sources(
         ../src/danp.c
-        ../src/danpSocket.c
-        ../src/danpBuffer.c
-        ../src/driver/danpLo.c
+        ../src/danp_socket.c
+        ../src/danp_buffer.c
+        ../src/driver/danp_lo.c
         # Add any other source files from src/ here
     )
 

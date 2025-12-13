@@ -1,6 +1,7 @@
 /* client.c - STREAM Client Example */
 
-#include "../exampleDefinitions.h"
+#include "../example_definitions.h"
+#include "danp/drivers/danp_zmq.h"
 #include "osal/osal.h"
 #include "danp/danp.h"
 #include <assert.h>
@@ -15,7 +16,7 @@ extern void danpZmqInit(
     int subCount,
     uint16_t nodeId);
 extern void danpLogMessageCallback(
-    danpLogLevel_t level,
+    danp_log_level_t level,
     const char *funcName,
     const char *message,
     va_list args);
@@ -27,10 +28,10 @@ void taskClient(void *arg)
     printf("[Client] Starting Stream Client...\n");
 
     // 1. Create Socket (STREAM)
-    danpSocket_t *sockStream = danpSocket(DANP_TYPE_STREAM);
+    danp_socket_t *sock_stream = danp_socket(DANP_TYPE_STREAM);
 
     // 2. Connect to Server (STREAM)
-    int32_t connectResult = danpConnect(sockStream, NODE_SERVER, STREAM_PORT);
+    int32_t connectResult = danp_connect(sock_stream, NODE_SERVER, STREAM_PORT);
     assert(connectResult == 0);
 
     for (int i = 0; i < 5; i++)
@@ -39,7 +40,7 @@ void taskClient(void *arg)
         sprintf(msg, "Hello %d", i);
         printf("[Client] Sending: %s\n", msg);
 
-        ret = danpSend(sockStream, msg, strlen(msg));
+        ret = danp_send(sock_stream, msg, strlen(msg));
         if (ret < 0)
         {
             printf("[Client] Send Failed! Breaking stream loop.\n");
@@ -48,7 +49,7 @@ void taskClient(void *arg)
 
         // Wait for reply
         char reply[64];
-        ret = danpRecv(sockStream, reply, sizeof(reply) - 1, 5000);
+        ret = danp_recv(sock_stream, reply, sizeof(reply) - 1, 5000);
         if (ret < 0)
         {
             printf("[Client] Receive Failed! Breaking stream loop.\n");
@@ -60,19 +61,21 @@ void taskClient(void *arg)
         osalDelayMs(1000);
     }
 
-    danpClose(sockStream); // Close the stream socket
+    danp_close(sock_stream); // Close the stream socket
     printf("[Client] Stream socket closed.\n");
 }
 
 int main()
 {
     const char *subEndpoints[] = {"tcp://localhost:5555"};
-    danpZmqInit("tcp://*:5556", subEndpoints, 1, NODE_CLIENT);
-    danpConfig_t config = {
-        .localNode = NODE_CLIENT,
-        .logFunction = danpLogMessageCallback,
+    danp_zmq_interface_t zmq_iface = {0};
+    danp_zmq_init(&zmq_iface, "tcp://*:5556", subEndpoints, 1, NODE_CLIENT);
+    danp_register_interface((danp_interface_t *)&zmq_iface);
+    danp_config_t config = {
+        .local_node = NODE_CLIENT,
+        .log_function = danpLogMessageCallback,
     };
-    danpInit(&config);
+    danp_init(&config);
     osalThreadAttr_t threadAttr = {
         .name = "ClientThread",
         .stackSize = 2048,
