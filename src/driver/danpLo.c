@@ -21,72 +21,72 @@
 
 /* Types */
 
-typedef struct danpLoContext_s
+typedef struct danp_lo_context_s
 {
     osalMessageQueueHandle_t mq;
-    danpLoInterface_t *iface;
-} danpLoContext_t;
+    danp_lo_interface_t *iface;
+} danp_lo_context_t;
 
 /* Forward Declarations */
 
 
 /* Variables */
 
-danpLoContext_t DanpLoContext;
+danp_lo_context_t danp_lo_context;
 
 /* Functions */
 
-int32_t danpLoTx (void *ifaceCommon, danpPacket_t *packet)
+int32_t danp_lo_tx(void *iface_common, danp_packet_t *packet)
 {
-    danpLoInterface_t *loIface = (danpLoInterface_t *)ifaceCommon;
-    danpLoContext_t *ctx = (danpLoContext_t *)loIface->context;
+    danp_lo_interface_t *lo_iface = (danp_lo_interface_t *)iface_common;
+    danp_lo_context_t *ctx = (danp_lo_context_t *)lo_iface->context;
 
-    danpLogMessage(
+    danp_log_message(
         DANP_LOG_VERBOSE,
         "LO TX: dst=%u port=%u flags=0x%02X len=%u",
-        (packet->headerRaw >> 22) & 0xFF,
-        (packet->headerRaw >> 8) & 0x3F,
-        packet->headerRaw & 0x03,
+        (packet->header_raw >> 22) & 0xFF,
+        (packet->header_raw >> 8) & 0x3F,
+        packet->header_raw & 0x03,
         packet->length);
 
-    osalStatus_t osalStatus = osalMessageQueueSend(ctx->mq, packet, OSAL_WAIT_FOREVER);
-    if (osalStatus != OSAL_SUCCESS)
+    osal_status_t osal_status = osalMessageQueueSend(ctx->mq, packet, OSAL_WAIT_FOREVER);
+    if (osal_status != OSAL_SUCCESS)
     {
-        danpLogMessage(DANP_LOG_ERROR, "DANP LO: Failed to enqueue packet for RX");
+        danp_log_message(DANP_LOG_ERROR, "DANP LO: Failed to enqueue packet for RX");
         return -1;
     }
 
     return 0;
 }
 
-void *danpLoRxRoutine(void *arg)
+void *danp_lo_rx_routine(void *arg)
 {
-    danpLoInterface_t *loIface = (danpLoInterface_t *)arg;
-    danpLoContext_t *ctx = (danpLoContext_t *)loIface->context;
+    danp_lo_interface_t *lo_iface = (danp_lo_interface_t *)arg;
+    danp_lo_context_t *ctx = (danp_lo_context_t *)lo_iface->context;
 
     for (;;)
     {
-        danpPacket_t pkt = {0};
+        danp_packet_t pkt = {0};
         if (0 == osalMessageQueueReceive(ctx->mq, &pkt, DANP_LO_TIMEOUT_MS))
         {
-            danpLogMessage(
+            danp_log_message(
                 DANP_LOG_VERBOSE,
                 "LO RX: dst=%u port=%u flags=0x%02X len=%u",
-                (pkt.headerRaw >> 22) & 0xFF,
-                (pkt.headerRaw >> 8) & 0x3F,
-                pkt.headerRaw & 0x03,
+                (pkt.header_raw >> 22) & 0xFF,
+                (pkt.header_raw >> 8) & 0x3F,
+                pkt.header_raw & 0x03,
                 pkt.length);
 
-            danpInput(&loIface->common, (uint8_t *)&pkt, pkt.length + sizeof(pkt.headerRaw));
+            danp_input(&lo_iface->common, (uint8_t *)&pkt, pkt.length + sizeof(pkt.header_raw));
         }
     }
 }
 
-int32_t danpLoInit (danpLoInterface_t *iface, uint16_t address)
+int32_t danp_lo_init (danp_lo_interface_t *iface, uint16_t address)
 {
     int32_t ret = 0;
-    osalThreadHandle_t threadHandle = NULL;
-    osalThreadAttr_t threadAttr =
+    osalThreadHandle_t thread_handle = NULL;
+    osalThreadAttr_t thread_attr =
     {
         .name = "danpLoCtx",
         .stackSize = DANP_LO_STACK_SIZE,
@@ -95,7 +95,7 @@ int32_t danpLoInit (danpLoInterface_t *iface, uint16_t address)
         .cbMem = NULL,
         .cbSize = 0,
     };
-    osalMessageQueueAttr_t mqAttr =
+    osalMessageQueueAttr_t mq_attr =
     {
         .name = "danpLoMq",
         .mqMem = NULL,
@@ -112,30 +112,30 @@ int32_t danpLoInit (danpLoInterface_t *iface, uint16_t address)
             break;
         }
 
-        memset(iface, 0, sizeof(danpLoInterface_t));
+        memset(iface, 0, sizeof(danp_lo_interface_t));
         iface->common.address = address;
-        iface->common.txFunc = danpLoTx;
+        iface->common.tx_func = danp_lo_tx;
         iface->common.name = "Loopback";
         iface->common.mtu = DANP_MAX_PACKET_SIZE;
-        iface->context = &DanpLoContext;
+        iface->context = &danp_lo_context;
 
-        DanpLoContext.iface = iface;
+        danp_lo_context.iface = iface;
 
-        DanpLoContext.mq = osalMessageQueueCreate(2, sizeof(danpPacket_t), &mqAttr);
-        if (DanpLoContext.mq == NULL)
+        danp_lo_context.mq = osalMessageQueueCreate(2, sizeof(danp_packet_t), &mq_attr);
+        if (danp_lo_context.mq == NULL)
         {
-            danpLogMessage(DANP_LOG_ERROR, "DANP LO: Failed to create message queue");
+            danp_log_message(DANP_LOG_ERROR, "DANP LO: Failed to create message queue");
             ret = -1;
             break;
         }
 
-        threadHandle = osalThreadCreate(
-            danpLoRxRoutine,
+        thread_handle = osalThreadCreate(
+            danp_lo_rx_routine,
             iface,
-            &threadAttr);
-        if (!threadHandle)
+            &thread_attr);
+        if (!thread_handle)
         {
-            danpLogMessage(DANP_LOG_ERROR, "DANP LO: Failed to create RX thread");
+            danp_log_message(DANP_LOG_ERROR, "DANP LO: Failed to create RX thread");
             ret = -1;
             break;
         }

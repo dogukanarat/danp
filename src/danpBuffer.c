@@ -24,20 +24,20 @@
 /* Variables */
 
 /** @brief Semaphore to protect the packet pool. */
-static osalMutexHandle_t BufferMutex;
+static osalMutexHandle_t buffer_mutex;
 
 /** @brief Pool of packets for allocation. */
-static danpPacket_t PacketPool[DANP_POOL_SIZE];
+static danp_packet_t packet_pool[DANP_POOL_SIZE];
 
 /** @brief Map of free packets in the pool. */
-static bool PacketFreeMap[DANP_POOL_SIZE];
+static bool packet_free_map[DANP_POOL_SIZE];
 
 /* Functions */
 
-int32_t danpBufferInit(void)
+int32_t danp_buffer_init(void)
 {
     int32_t status = 0;
-    osalMutexAttr_t semAttr = {
+    osalMutexAttr_t sem_attr = {
         .name = "DanpPoolLock",
         .attrBits = OSAL_MUTEX_PRIO_INHERIT,
         .cbMem = NULL,
@@ -48,17 +48,17 @@ int32_t danpBufferInit(void)
     {
         for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
         {
-            PacketFreeMap[i] = true;
+            packet_free_map[i] = true;
         }
 
-        BufferMutex = osalMutexCreate(&semAttr);
-        if (!BufferMutex)
+        buffer_mutex = osalMutexCreate(&sem_attr);
+        if (!buffer_mutex)
         {
-            danpLogMessage(DANP_LOG_ERROR, "Failed to create packet pool mutex");
+            danp_log_message(DANP_LOG_ERROR, "Failed to create packet pool mutex");
             status = -ENOMEM;
         }
 
-        danpLogMessage(DANP_LOG_INFO, "DANP packet pool initialized");
+        danp_log_message(DANP_LOG_INFO, "DANP packet pool initialized");
 
         break;
     }
@@ -70,42 +70,42 @@ int32_t danpBufferInit(void)
  * @brief Allocate a packet from the pool.
  * @return Pointer to the allocated packet, or NULL if pool is empty.
  */
-danpPacket_t *danpBufferAllocate(void)
+danp_packet_t *danp_buffer_allocate(void)
 {
-    danpPacket_t *pkt = NULL;
-    bool isMutexTaken = false;
+    danp_packet_t *pkt = NULL;
+    bool is_mutex_taken = false;
 
     for (;;)
     {
-        if (0 != osalMutexLock(BufferMutex, OSAL_WAIT_FOREVER))
+        if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
             break;
         }
-        isMutexTaken = true;
+        is_mutex_taken = true;
 
         for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
         {
-            if (PacketFreeMap[i])
+            if (packet_free_map[i])
             {
-                PacketFreeMap[i] = false;
-                pkt = &PacketPool[i];
+                packet_free_map[i] = false;
+                pkt = &packet_pool[i];
                 break;
             }
         }
         if (!pkt)
         {
-            danpLogMessage(DANP_LOG_ERROR, "Packet pool out of memory");
+            danp_log_message(DANP_LOG_ERROR, "Packet pool out of memory");
             break;
         }
 
-        danpLogMessage(DANP_LOG_VERBOSE, "Allocated packet from pool");
+        danp_log_message(DANP_LOG_VERBOSE, "Allocated packet from pool");
 
         break;
     }
 
-    if (isMutexTaken)
+    if (is_mutex_taken)
     {
-        osalMutexUnlock(BufferMutex);
+        osalMutexUnlock(buffer_mutex);
     }
 
     return pkt;
@@ -115,48 +115,48 @@ danpPacket_t *danpBufferAllocate(void)
  * @brief Free a packet back to the pool.
  * @param pkt Pointer to the packet to free.
  */
-void danpBufferFree(danpPacket_t *pkt)
+void danp_buffer_free(danp_packet_t *pkt)
 {
-    bool isMutexTaken = false;
+    bool is_mutex_taken = false;
     int32_t index;
 
     for (;;)
     {
         if (!pkt)
         {
-            danpLogMessage(DANP_LOG_WARN, "Attempted to free NULL packet");
+            danp_log_message(DANP_LOG_WARN, "Attempted to free NULL packet");
             break;
         }
 
-        if (0 != osalMutexLock(BufferMutex, OSAL_WAIT_FOREVER))
+        if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
             break;
         }
-        isMutexTaken = true;
+        is_mutex_taken = true;
 
-        index = pkt - PacketPool;
+        index = pkt - packet_pool;
         if (index < 0 || index >= DANP_POOL_SIZE)
         {
-            danpLogMessage(DANP_LOG_ERROR, "Attempted to free invalid packet");
+            danp_log_message(DANP_LOG_ERROR, "Attempted to free invalid packet");
             break;
         }
 
-        if (PacketFreeMap[index])
+        if (packet_free_map[index])
         {
-            danpLogMessage(DANP_LOG_WARN, "Attempted to free already free packet");
+            danp_log_message(DANP_LOG_WARN, "Attempted to free already free packet");
             break;
         }
 
-        PacketFreeMap[index] = true;
+        packet_free_map[index] = true;
 
-        danpLogMessage(DANP_LOG_VERBOSE, "Freed packet back to pool");
+        danp_log_message(DANP_LOG_VERBOSE, "Freed packet back to pool");
 
         break;
     }
 
-    if (isMutexTaken)
+    if (is_mutex_taken)
     {
-        osalMutexUnlock(BufferMutex);
+        osalMutexUnlock(buffer_mutex);
     }
 }
 
@@ -164,34 +164,34 @@ void danpBufferFree(danpPacket_t *pkt)
  * @brief Get the number of free packets in the pool.
  * @return Number of free packets.
  */
-size_t danpBufferGetFreeCount(void)
+size_t danp_buffer_get_free_count(void)
 {
-    size_t freeCount = 0;
-    bool isMutexTaken = false;
+    size_t free_count = 0;
+    bool is_mutex_taken = false;
 
     for (;;)
     {
-        if (0 != osalMutexLock(BufferMutex, OSAL_WAIT_FOREVER))
+        if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
             break;
         }
-        isMutexTaken = true;
+        is_mutex_taken = true;
 
         for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
         {
-            if (PacketFreeMap[i])
+            if (packet_free_map[i])
             {
-                freeCount++;
+                free_count++;
             }
         }
 
         break;
     }
 
-    if (isMutexTaken)
+    if (is_mutex_taken)
     {
-        osalMutexUnlock(BufferMutex);
+        osalMutexUnlock(buffer_mutex);
     }
 
-    return freeCount;
+    return free_count;
 }

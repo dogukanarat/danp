@@ -23,22 +23,22 @@ extern "C" {
 
 /* Types */
 
-typedef struct danpZmqInterface_s
+typedef struct danp_zmq_interface_s
 {
-    danpInterface_t common;
-    void *pubSock;
-    void *subSock;
-    uint32_t rxThreadId;
-} danpZmqInterface_t;
+    danp_interface_t common;
+    void *pub_sock;
+    void *sub_sock;
+    uint32_t rx_thread_id;
+} danp_zmq_interface_t;
 
 /* External Declarations */
 
-extern void danpZmqInit(
-    danpZmqInterface_t *iface,
-    const char *pubBindEndpoint,
-    const char **subConnectEndpoints,
-    int32_t subCount,
-    uint16_t nodeId);
+extern void danp_zmq_init(
+    danp_zmq_interface_t *iface,
+    const char *pub_bind_endpoint,
+    const char **sub_connect_endpoints,
+    int32_t sub_count,
+    uint16_t node_id);
 
 #ifdef __cplusplus
 }

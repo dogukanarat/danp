@@ -37,15 +37,15 @@
  * [timestamp][function_name][level] message
  *
  * Example output:
- * [1234][danpSocket][Info] Socket created successfully
+ * [1234][danp_socket][Info] Socket created successfully
  *
  * @param level Log severity level (DEBUG, INFO, WARN, ERROR)
  * @param func_name Name of the function generating the log
  * @param message Format string for the log message
  * @param ... Variable arguments for format string
  */
-void danpLogMessageWithFuncName(
-    danpLogLevel_t level,
+void danp_log_message_with_func_name(
+    danp_log_level_t level,
     const char *func_name,
     const char *message,
     ...)
