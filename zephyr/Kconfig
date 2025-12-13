@@ -1,0 +1,5 @@
+config DANP
+    bool "DANP Network Library"
+    default y
+    help
+      Enable the DANP library.

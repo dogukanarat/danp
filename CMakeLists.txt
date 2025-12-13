@@ -67,11 +67,8 @@ target_sources(danp
     PRIVATE
         src/danp.c
         src/danpSocket.c
+        src/danpBuffer.c
 )
-
-if(DANP_ARCH_FREERTOS)
-    target_sources(danp PRIVATE src/arch/danpFreeRTOS.c)
-endif()
 
 # Driver sources
 if(DANP_ZMQ_SUPPORT)
@@ -207,7 +204,7 @@ if(INSTALL_DOCS)
         COMPONENT Documentation
         OPTIONAL
     )
-    
+
     install(DIRECTORY
         ${CMAKE_CURRENT_SOURCE_DIR}/docs/html
         ${CMAKE_CURRENT_SOURCE_DIR}/sphinx
@@ -226,6 +223,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY ${PROJECT_DESCRIPTION})
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
     set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-    
+
     include(CPack)
 endif()

@@ -15,6 +15,7 @@ extern danpConfig_t DanpConfig;
 
 /* Definitions */
 
+#define DANP_MAX_SOCKET_COUNT              (20)
 
 /* Types */
 
@@ -25,10 +26,15 @@ extern danpConfig_t DanpConfig;
 /* Variables */
 
 /** @brief List of active sockets. */
-static danpSocket_t *SocketList = NULL;
+static danpSocket_t *SocketList;
 
 /** @brief Next available ephemeral port. */
 static uint16_t NextEphemeralPort = 1;
+
+/** @brief Mutex for socket operations. */
+static osalMutexHandle_t MutexSocket;
+
+static danpSocket_t SocketPool[DANP_MAX_SOCKET_COUNT];
 
 /* Functions */
 
@@ -43,9 +49,15 @@ static danpSocket_t *danpFindSocket(uint16_t localPort, uint16_t remoteNode, uin
 {
     danpSocket_t *cur = SocketList;
     danpSocket_t *ret = NULL;
+    size_t i = 0;
 
     while (cur)
     {
+        if (i >= DANP_MAX_SOCKET_COUNT)
+        {
+            // Safety check to prevent infinite loops
+            break;
+        }
         if (cur->localPort == localPort)
         {
             // Priority 1: Exact Match (Established/Connecting streams or Connected DGRAM)
@@ -61,9 +73,11 @@ static danpSocket_t *danpFindSocket(uint16_t localPort, uint16_t remoteNode, uin
             if (cur->state == DANP_SOCK_LISTENING || (cur->type == DANP_TYPE_DGRAM && cur->state == DANP_SOCK_OPEN))
             {
                 ret = cur;
+                break;
             }
         }
         cur = cur->next;
+        i++;
     }
 
     return ret;
@@ -77,7 +91,7 @@ static danpSocket_t *danpFindSocket(uint16_t localPort, uint16_t remoteNode, uin
  */
 static void danpSendControl(danpSocket_t *sock, uint8_t flags, uint8_t seqNum)
 {
-    danpPacket_t *pkt = danpAllocPacket();
+    danpPacket_t *pkt = danpBufferAllocate();
 
     for (;;)
     {
@@ -106,10 +120,35 @@ static void danpSendControl(danpSocket_t *sock, uint8_t flags, uint8_t seqNum)
         }
 
         danpRouteTx(pkt);
-        danpFreePacket(pkt);
+        danpBufferFree(pkt);
 
         break;
     }
+}
+
+/**
+ * @brief Initialize the socket subsystem.
+ * @return int32_t
+ */
+int32_t danpSocketInit(void)
+{
+    MutexSocket = osalMutexCreate(NULL);
+    if (!MutexSocket)
+    {
+        danpLogMessage(DANP_LOG_ERROR, "Failed to create socket mutex");
+        return -1;
+    }
+
+    // Initialize socket pool
+    for (int i = 0; i < DANP_MAX_SOCKET_COUNT; i++)
+    {
+        SocketPool[i].state = DANP_SOCK_CLOSED;
+        SocketPool[i].next = NULL;
+    }
+
+    SocketList = NULL;
+
+    return 0;
 }
 
 /**
@@ -119,92 +158,119 @@ static void danpSendControl(danpSocket_t *sock, uint8_t flags, uint8_t seqNum)
  */
 danpSocket_t *danpSocket(danpSocketType_t type)
 {
-    static danpSocket_t staticSockets[20] = {0};
-    danpSocket_t *s = NULL;
-    osalQueueHandle_t rxQ;
-    osalQueueHandle_t accQ;
-    osalSemaphoreHandle_t sig;
-    danpPacket_t *garbagePkt;
-    danpSocket_t *garbageSock;
-    osalMessageQueueAttr_t mqAttr = {
-        .name = "danpSocketRx",
-        .cbMem = NULL,
-        .cbSize = 0,
-        .mqMem = NULL,
-        .mqSize = 0,
-    };
-    osalSemaphoreAttr_t semAttr = {
-        .name = "danpSocketSig",
-        .maxCount = 1,
-        .initialCount = 0,
-        .cbMem = NULL,
-        .cbSize = 0,
-    };
+    osalStatus_t osalStatus;
+    bool isMutexTaken = false;
+    danpSocket_t *createdSocket = NULL;
+    danpSocket_t *slot = NULL;
+    osalMessageQueueHandle_t rxQ = NULL;
+    osalMessageQueueHandle_t accQ = NULL;
+    osalSemaphoreHandle_t sig = NULL;
+    osalMessageQueueAttr_t mqAttr = { .name = "danpSockRx", .mqSize = 0 /*...*/ };
+    osalSemaphoreAttr_t semAttr   = { .name = "danpSockSig", .maxCount = 1 /*...*/ };
 
     for (;;)
     {
-        for (int i = 0; i < 20; i++)
+        osalStatus = osalMutexLock(MutexSocket, OSAL_WAIT_FOREVER);
+        if (osalStatus != OSAL_SUCCESS)
         {
-            if (staticSockets[i].state == DANP_SOCK_CLOSED && staticSockets[i].localPort == 0)
+            danpLogMessage(DANP_LOG_ERROR, "Socket allocation failed: Mutex Lock Error");
+            break; // Jump to cleanup
+        }
+        isMutexTaken = true;
+
+        for (int i = 0; i < DANP_MAX_SOCKET_COUNT; i++)
+        {
+            if (SocketPool[i].state == DANP_SOCK_CLOSED && SocketPool[i].localPort == 0)
             {
-                s = &staticSockets[i];
+                slot = &SocketPool[i];
                 break;
             }
         }
 
-        if (!s)
+        if (slot == NULL)
         {
-            danpLogMessage(DANP_LOG_ERROR, "No free socket slots");
-            break;
+            danpLogMessage(DANP_LOG_ERROR, "Socket allocation failed: No free slots");
+            break; // Jump to cleanup
         }
 
-        rxQ = s->rxQueue;
-        accQ = s->acceptQueue;
-        sig = s->signal;
-
-        memset(s, 0, sizeof(danpSocket_t));
-
-        // Restore handles
-        s->rxQueue = rxQ;
-        s->acceptQueue = accQ;
-        s->signal = sig;
-
-        s->type = type;
-        s->state = DANP_SOCK_OPEN;
-        s->txSeq = 0;
-        s->rxExpectedSeq = 0;
-        s->localNode = DanpConfig.localNode;
-
-        if (!s->rxQueue)
+        if (SocketList == slot)
         {
-            s->rxQueue = osalMessageQueueCreate(10, sizeof(danpPacket_t *), &mqAttr);
+            SocketList = slot->next;
         }
-        if (!s->acceptQueue)
+        else
         {
-            s->acceptQueue = osalMessageQueueCreate(5, sizeof(danpSocket_t *), &mqAttr);
-        }
-        if (!s->signal)
-        {
-            s->signal = osalSemaphoreCreate(&semAttr);
+            for (int i = 0; i < DANP_MAX_SOCKET_COUNT; i++)
+            {
+                if (SocketPool[i].next == slot)
+                {
+                    SocketPool[i].next = slot->next;
+                    break;
+                }
+            }
         }
 
-        // Flush queues to ensure clean state
-        while (0 == osalMessageQueueReceive(s->rxQueue, &garbagePkt, 0))
+        rxQ = slot->rxQueue;
+        accQ = slot->acceptQueue;
+        sig = slot->signal;
+
+        memset(slot, 0, sizeof(danpSocket_t));
+
+        slot->rxQueue = rxQ;
+        slot->acceptQueue = accQ;
+        slot->signal = sig;
+
+        slot->type = type;
+        slot->state = DANP_SOCK_OPEN; // Temporarily mark open
+        slot->localNode = DanpConfig.localNode;
+
+        if (slot->rxQueue == NULL)
         {
-            danpFreePacket(garbagePkt);
+            slot->rxQueue = osalMessageQueueCreate(10, sizeof(danpPacket_t *), &mqAttr);
         }
-        while (0 == osalMessageQueueReceive(s->acceptQueue, &garbageSock, 0))
+        if (slot->acceptQueue == NULL)
         {
-            // Just drain the queue, the sockets themselves should have been closed/handled elsewhere
+            slot->acceptQueue = osalMessageQueueCreate(5, sizeof(danpSocket_t *), &mqAttr);
+        }
+        if (slot->signal == NULL)
+        {
+            slot->signal = osalSemaphoreCreate(&semAttr);
         }
 
-        s->next = SocketList;
-        SocketList = s;
+        if (slot->rxQueue == NULL || slot->acceptQueue == NULL || slot->signal == NULL)
+        {
+            danpLogMessage(DANP_LOG_ERROR, "Socket allocation failed: OS Resource Error");
+
+            slot->state = DANP_SOCK_CLOSED;
+
+            break; // Jump to cleanup
+        }
+
+        danpPacket_t *garbagePkt;
+        danpSocket_t *garbageSock;
+
+        while (osalMessageQueueReceive(slot->rxQueue, &garbagePkt, 0) == 0)
+        {
+            danpBufferFree(garbagePkt);
+        }
+        while (osalMessageQueueReceive(slot->acceptQueue, &garbageSock, 0) == 0)
+        {
+            // Just drain
+        }
+
+        slot->next = SocketList;
+        SocketList = slot;
+
+        createdSocket = slot;
 
         break;
     }
 
-    return s;
+    if (isMutexTaken)
+    {
+        osalMutexUnlock(MutexSocket);
+    }
+
+    return createdSocket;
 }
 
 /**
@@ -216,9 +282,20 @@ danpSocket_t *danpSocket(danpSocketType_t type)
 int32_t danpBind(danpSocket_t *sock, uint16_t port)
 {
     int32_t ret = 0;
+    osalStatus_t osalStatus;
+    bool isMutexTaken = false;
 
     for (;;)
     {
+        osalStatus = osalMutexLock(MutexSocket, OSAL_WAIT_FOREVER);
+        if (osalStatus != OSAL_SUCCESS)
+        {
+            danpLogMessage(DANP_LOG_ERROR, "Socket bind failed: Mutex Lock Error");
+            ret = -1;
+            break;
+        }
+        isMutexTaken = true;
+
         if (port == 0)
         {
             port = NextEphemeralPort++;
@@ -236,6 +313,11 @@ int32_t danpBind(danpSocket_t *sock, uint16_t port)
         danpLogMessage(DANP_LOG_INFO, "Socket bound to port %u", port);
 
         break;
+    }
+
+    if (isMutexTaken)
+    {
+        osalMutexUnlock(MutexSocket);
     }
 
     return ret;
@@ -270,6 +352,25 @@ int32_t danpClose(danpSocket_t *sock)
     {
         danpSendControl(sock, DANP_FLAG_RST, 0);
     }
+
+    // Unlink from global SocketList
+    if (SocketList == sock)
+    {
+        SocketList = sock->next;
+    }
+    else
+    {
+        danpSocket_t *prev = SocketList;
+        while (prev && prev->next != sock)
+        {
+            prev = prev->next;
+        }
+        if (prev && prev->next == sock)
+        {
+            prev->next = sock->next;
+        }
+    }
+    sock->next = NULL;
 
     // Clean up state for slot recycling
     sock->state = DANP_SOCK_CLOSED;
@@ -381,10 +482,9 @@ int32_t danpSend(danpSocket_t *sock, void *data, uint16_t len)
             break;
         }
 
-        // DGRAM (Unreliable)
         if (sock->type == DANP_TYPE_DGRAM)
         {
-            danpPacket_t *pkt = danpAllocPacket();
+            danpPacket_t *pkt = danpBufferAllocate();
             if (!pkt)
             {
                 ret = -1;
@@ -400,15 +500,14 @@ int32_t danpSend(danpSocket_t *sock, void *data, uint16_t len)
             memcpy(pkt->payload, data, len);
             pkt->length = len;
             danpRouteTx(pkt);
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             ret = len;
             break;
         }
 
-        // STREAM (Stop-and-Wait)
         while (retries < DANP_RETRY_LIMIT && !ackReceived)
         {
-            pkt = danpAllocPacket();
+            pkt = danpBufferAllocate();
             if (!pkt)
             {
                 osalDelayMs(10);
@@ -425,7 +524,7 @@ int32_t danpSend(danpSocket_t *sock, void *data, uint16_t len)
             memcpy(pkt->payload + 1, data, len);
             pkt->length = len + 1;
             danpRouteTx(pkt);
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
 
             if (0 == osalSemaphoreTake(sock->signal, DANP_ACK_TIMEOUT_MS))
             {
@@ -468,6 +567,12 @@ int32_t danpRecv(danpSocket_t *sock, void *buffer, uint16_t maxLen, uint32_t tim
 
     if (0 == osalMessageQueueReceive(sock->rxQueue, &pkt, timeoutMs))
     {
+        if (pkt == NULL)
+        {
+            // Socket closed or reset
+            return 0;
+        }
+
         if (sock->type == DANP_TYPE_DGRAM)
         {
             copyLen = (pkt->length > maxLen) ? maxLen : pkt->length;
@@ -481,15 +586,12 @@ int32_t danpRecv(danpSocket_t *sock, void *buffer, uint16_t maxLen, uint32_t tim
                 memcpy(buffer, pkt->payload + 1, copyLen);
             }
         }
-        danpFreePacket(pkt);
+        danpBufferFree(pkt);
         ret = copyLen;
     }
     return ret;
 }
 
-/* ========================================================================
- * INPUT HANDLER
- * ======================================================================== */
 /**
  * @brief Handle incoming packets for sockets.
  * @param pkt Pointer to the received packet.
@@ -506,9 +608,19 @@ void danpSocketInputHandler(danpPacket_t *pkt)
     // bool isConnected = false;
     danpSocket_t *child = NULL;
     danpPacket_t *garbage;
+    bool isMutexTaken = false;
+    osalStatus_t osalStatus;
 
     for (;;)
     {
+        osalStatus = osalMutexLock(MutexSocket, OSAL_WAIT_FOREVER);
+        if (osalStatus != OSAL_SUCCESS)
+        {
+            danpLogMessage(DANP_LOG_ERROR, "Socket Input Handler: Mutex Lock Error");
+            break;
+        }
+        isMutexTaken = true;
+
         danpUnpackHeader(pkt->headerRaw, &dst, &src, &dstPort, &srcPort, &flags);
         danpSocket_t *sock = danpFindSocket(dstPort, src, srcPort);
 
@@ -527,6 +639,10 @@ void danpSocketInputHandler(danpPacket_t *pkt)
                         dstPort);
                     sock->state = DANP_SOCK_CLOSED;
                     sock->localPort = 0;
+
+                    // Wake up any waiters on recv
+                    danpPacket_t *nullPkt = NULL;
+                    osalMessageQueueSend(sock->rxQueue, &nullPkt, 0);
                 }
                 else
                 {
@@ -534,14 +650,14 @@ void danpSocketInputHandler(danpPacket_t *pkt)
                     danpLogMessage(DANP_LOG_WARN, "Ignored RST on DGRAM socket Port %u", dstPort);
                 }
             }
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             break;
         }
 
         if (!sock)
         {
             danpLogMessage(DANP_LOG_WARN, "No socket found for Port %u", dstPort);
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             break;
         }
 
@@ -557,14 +673,14 @@ void danpSocketInputHandler(danpPacket_t *pkt)
 
                 while (0 == osalMessageQueueReceive(sock->rxQueue, &garbage, 0))
                 {
-                    danpFreePacket(garbage); // Clear out old data
+                    danpBufferFree(garbage); // Clear out old data
                 }
             }
 
             danpSendControl(sock, DANP_FLAG_ACK | DANP_FLAG_SYN, 0);
             sock->state = DANP_SOCK_SYN_RECEIVED;
 
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             return;
         }
 
@@ -575,7 +691,7 @@ void danpSocketInputHandler(danpPacket_t *pkt)
             child = danpSocket(sock->type);
             if (!child)
             {
-                danpFreePacket(pkt);
+                danpBufferFree(pkt);
                 break;
             }
 
@@ -590,12 +706,12 @@ void danpSocketInputHandler(danpPacket_t *pkt)
             {
                 child->state = DANP_SOCK_CLOSED;
                 child->localPort = 0;
-                danpFreePacket(pkt);
+                danpBufferFree(pkt);
                 break;
             }
 
             danpSendControl(child, DANP_FLAG_ACK | DANP_FLAG_SYN, 0);
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             break;
         }
 
@@ -604,7 +720,7 @@ void danpSocketInputHandler(danpPacket_t *pkt)
             sock->state = DANP_SOCK_ESTABLISHED;
             danpSendControl(sock, DANP_FLAG_ACK, 0); // Send final ACK
             osalSemaphoreGive(sock->signal);
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             break;
         }
 
@@ -613,7 +729,7 @@ void danpSocketInputHandler(danpPacket_t *pkt)
         {
             // Final ACK received from client/resync, connection is fully active
             sock->state = DANP_SOCK_ESTABLISHED;
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             break;
         }
 
@@ -629,7 +745,7 @@ void danpSocketInputHandler(danpPacket_t *pkt)
                     osalSemaphoreGive(sock->signal);
                 }
             }
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             break;
         }
 
@@ -661,16 +777,21 @@ void danpSocketInputHandler(danpPacket_t *pkt)
                 else
                 {
                     danpSendControl(sock, DANP_FLAG_ACK, seq);
-                    danpFreePacket(pkt);
+                    danpBufferFree(pkt);
                 }
             }
 
             break;
         }
 
-        danpFreePacket(pkt);
+        danpBufferFree(pkt);
 
         break;
+    }
+
+    if (isMutexTaken)
+    {
+        osalMutexUnlock(MutexSocket);
     }
 }
 
@@ -700,7 +821,7 @@ int32_t danpSendTo(danpSocket_t *sock, void *data, uint16_t len, uint16_t dstNod
             ret = -1;
             break;
         }
-        pkt = danpAllocPacket();
+        pkt = danpBufferAllocate();
         if (!pkt)
         {
             ret = -1;
@@ -711,7 +832,7 @@ int32_t danpSendTo(danpSocket_t *sock, void *data, uint16_t len, uint16_t dstNod
         memcpy(pkt->payload, data, len);
         pkt->length = len;
         danpRouteTx(pkt);
-        danpFreePacket(pkt);
+        danpBufferFree(pkt);
 
         ret = len;
 
@@ -771,7 +892,7 @@ int32_t danpRecvFrom(
                 *srcPort = sPort;
             }
 
-            danpFreePacket(pkt);
+            danpBufferFree(pkt);
             ret = copyLen;
         }
 
@@ -779,4 +900,33 @@ int32_t danpRecvFrom(
     }
 
     return ret;
+}
+
+void danpPrintStats(void (*printFunc)(const char *fmt, ...))
+{
+    if (printFunc == NULL)
+    {
+        return;
+    }
+
+    printFunc("DANP Socket Stats:\n");
+    printFunc("    Max Sockets: %d\n", DANP_MAX_SOCKET_COUNT);
+    printFunc("    Next Ephemeral Port: %u\n", NextEphemeralPort);
+    printFunc("    Active Sockets:\n");
+    danpSocket_t *cur = SocketList;
+    while (cur)
+    {
+        printFunc("      Socket on Local Port %u - State: %d, Type: %d, Remote Node: %u, Remote Port: %u\n",
+            cur->localPort,
+            cur->state,
+            cur->type,
+            cur->remoteNode,
+            cur->remotePort);
+        cur = cur->next;
+    }
+    printFunc("\n");
+
+    printFunc("DANP Buffer Stats:\n");
+    printFunc("    Free Buffers: %zu\n", danpBufferGetFreeCount());
+
 }
