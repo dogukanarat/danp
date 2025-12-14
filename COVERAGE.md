@@ -44,6 +44,8 @@ This script will:
 3. Run all tests
 4. Generate coverage reports (both text and HTML)
 
+> Continuous integration automatically runs these steps in `.github/workflows/ci.yml` and uploads the resulting LCOV data plus HTML report as artifacts.
+
 To start fresh with a clean build:
 ```bash
 ./run_coverage.sh clean

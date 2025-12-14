@@ -2,14 +2,16 @@
 # Test Suite Configuration
 # ============================================================================
 
-# Fetch Unity testing framework
-include(FetchContent)
-FetchContent_Declare(
-    unity
-    GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
-    GIT_TAG v2.5.2
-)
-FetchContent_MakeAvailable(unity)
+# Unity via vcpkg
+find_package(unity CONFIG REQUIRED)
+
+if(TARGET unity::unity)
+    set(UNITY_TARGET unity::unity)
+elseif(TARGET unity)
+    set(UNITY_TARGET unity)
+else()
+    message(FATAL_ERROR "Unity package found but exported target is unknown.")
+endif()
 
 # ============================================================================
 # Test Helper Function
@@ -34,7 +36,7 @@ function(danp_add_test TEST_NAME)
     target_link_libraries(${TEST_NAME}
         PRIVATE
             danp::danp
-            unity
+            ${UNITY_TARGET}
             Threads::Threads
     )
 
@@ -73,7 +75,7 @@ if(ENABLE_COVERAGE)
         NAME coverage
         EXECUTABLE ctest
         EXECUTABLE_ARGS --output-on-failure
-        DEPENDENCIES test_core test_dgram test_stream
+        DEPENDENCIES test_core test_dgram test_stream test_route
         EXCLUDE
             'test/*'
             'unity/*'

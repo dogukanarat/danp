@@ -171,6 +171,7 @@ CLOSED ← [listen] → LISTENING → [SYN] → SYN_RECEIVED → [ACK] → ESTAB
 - **CMake**: 3.14 or higher
 - **C Compiler**: C99 compatible (GCC, Clang)
 - **Threads**: POSIX threads (for POSIX builds)
+- **vcpkg**: Used to fetch `osal`, `unity`, and `ZeroMQ` (manifest described in `vcpkg.json`)
 
 ### Optional Dependencies
 
@@ -185,6 +186,24 @@ CLOSED ← [listen] → LISTENING → [SYN] → SYN_RECEIVED → [ACK] → ESTAB
 - **FreeRTOS**: FreeRTOS 10.x or compatible
 
 ## Building
+
+### Dependency Management (vcpkg)
+
+This project relies on the vcpkg manifest (`vcpkg.json`) to pull OSAL, Unity, and ZeroMQ.
+
+```bash
+# Clone vcpkg and bootstrap it once
+git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
+$HOME/vcpkg/bootstrap-vcpkg.sh
+
+# Configure CMake with the vcpkg toolchain (one-time or via presets)
+export VCPKG_ROOT=$HOME/vcpkg
+cmake -S . -B build -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --build build
+```
+
+> The GitHub Actions workflow uses `microsoft/setup-vcpkg@v1`, so no manual steps are required in CI.
 
 ### Basic Build
 
@@ -218,12 +237,16 @@ cmake -DBUILD_TESTS=ON ..
 
 ```bash
 # Development build
-cmake --preset=dev
-cmake --build --preset=dev
+cmake --preset=Debug -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --build --preset=Debug
 
 # Release build
-cmake --preset=release
-cmake --build --preset=release
+cmake --preset=Release -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --build --preset=Release
+
+# Coverage build
+cmake --preset=Coverage -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --build --preset=Coverage
 ```
 
 ### Documentation
@@ -390,18 +413,38 @@ make
 ### Unit Tests
 
 ```bash
-cmake -DBUILD_TESTS=ON ..
-make
-ctest --verbose
+cmake -S . -B build -DBUILD_TESTS=ON \
+  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 ### Test Coverage
+
+```bash
+# After configuring with -DENABLE_COVERAGE=ON and BUILD_TESTS=ON
+cmake --build build --target coverage
+```
+
+Artifacts:
+- `build/coverage.info.cleaned`: textual summary
+- `build/coverage_html/index.html`: HTML report
+
+The CI workflow publishes both files as artifacts for every run.
 
 - Core packet handling
 - DGRAM socket operations
 - STREAM socket operations
 - Connection management
 - Reliability mechanisms
+
+## Continuous Integration
+
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Runs on pushes and pull requests targeting `main` or `master`
+- Installs Ninja/lcov, bootstraps vcpkg to fetch OSAL, Unity, and ZeroMQ
+- Configures CMake with coverage + test flags, then builds and runs `ctest`
+- Generates the `coverage` target and uploads both LCOV data and HTML reports as artifacts
 
 ## Platform Support
 

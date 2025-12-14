@@ -1,6 +1,8 @@
 build/
 docs/xml/
 sphinx/
+vcpkg_installed/
+vcpkg-logs/
 
 # Coverage files
 *.gcda
