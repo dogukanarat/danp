@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Build, test, and coverage
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ninja-build lcov
+
+      - name: Setup vcpkg
+        uses: microsoft/setup-vcpkg@v1
+        with:
+          vcpkgJson: vcpkg.json
+          triplet: x64-linux
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B $BUILD_DIR
+          -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTS=ON
+          -DENABLE_COVERAGE=ON
+          -DBUILD_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build $BUILD_DIR
+
+      - name: Run unit tests
+        run: ctest --test-dir $BUILD_DIR --output-on-failure
+
+      - name: Generate coverage report
+        run: cmake --build $BUILD_DIR --target coverage
+
+      - name: Upload coverage summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-info
+          path: |
+            ${{ env.BUILD_DIR }}/coverage.info.cleaned
+            ${{ env.BUILD_DIR }}/coverage.base
+            ${{ env.BUILD_DIR }}/coverage.info
+            ${{ env.BUILD_DIR }}/coverage.total
+          if-no-files-found: ignore
+
+      - name: Upload coverage HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: ${{ env.BUILD_DIR }}/coverage_html
+          if-no-files-found: ignore
