@@ -47,7 +47,24 @@ endif()
 # Dependencies
 # ============================================================================
 find_package(Threads REQUIRED)
-find_package(osal REQUIRED)
+
+include(FetchContent)
+
+set(OSAL_GIT_TAG "master" CACHE STRING "Git ref for the OSAL dependency")
+FetchContent_Declare(
+    osal
+    GIT_REPOSITORY https://github.com/dogukanarat/osal.git
+    GIT_TAG ${OSAL_GIT_TAG}
+)
+FetchContent_MakeAvailable(osal)
+
+if(TARGET osal::osal)
+    set(OSAL_TARGET osal::osal)
+elseif(TARGET osal)
+    set(OSAL_TARGET osal)
+else()
+    message(FATAL_ERROR "OSAL dependency is available but no known target was exported")
+endif()
 
 if(DANP_ZMQ_SUPPORT)
     find_package(ZeroMQ REQUIRED)
@@ -91,7 +108,7 @@ target_include_directories(danp
 target_link_libraries(danp
     PUBLIC
         Threads::Threads
-        osal::osal
+        ${OSAL_TARGET}
 )
 
 if(DANP_ZMQ_SUPPORT)

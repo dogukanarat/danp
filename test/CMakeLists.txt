@@ -2,15 +2,21 @@
 # Test Suite Configuration
 # ============================================================================
 
-# Unity via vcpkg
-find_package(unity CONFIG REQUIRED)
+# Unity via FetchContent
+include(FetchContent)
+FetchContent_Declare(
+    unity
+    GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
+    GIT_TAG v2.5.2
+)
+FetchContent_MakeAvailable(unity)
 
 if(TARGET unity::unity)
     set(UNITY_TARGET unity::unity)
 elseif(TARGET unity)
     set(UNITY_TARGET unity)
 else()
-    message(FATAL_ERROR "Unity package found but exported target is unknown.")
+    message(FATAL_ERROR "Unity package fetched but exported target is unknown.")
 endif()
 
 # ============================================================================

@@ -171,7 +171,6 @@ CLOSED ← [listen] → LISTENING → [SYN] → SYN_RECEIVED → [ACK] → ESTAB
 - **CMake**: 3.14 or higher
 - **C Compiler**: C99 compatible (GCC, Clang)
 - **Threads**: POSIX threads (for POSIX builds)
-- **vcpkg**: Used to fetch `osal`, `unity`, and `ZeroMQ` (manifest described in `vcpkg.json`)
 
 ### Optional Dependencies
 
@@ -187,23 +186,14 @@ CLOSED ← [listen] → LISTENING → [SYN] → SYN_RECEIVED → [ACK] → ESTAB
 
 ## Building
 
-### Dependency Management (vcpkg)
+### Dependency Fetching
 
-This project relies on the vcpkg manifest (`vcpkg.json`) to pull OSAL, Unity, and ZeroMQ.
+The build uses CMake's `FetchContent` to pull required dependencies automatically:
 
-```bash
-# Clone vcpkg and bootstrap it once
-git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
-$HOME/vcpkg/bootstrap-vcpkg.sh
+- **OSAL**: `https://github.com/dogukanarat/osal`
+- **Unity** (tests): `https://github.com/ThrowTheSwitch/Unity`
 
-# Configure CMake with the vcpkg toolchain (one-time or via presets)
-export VCPKG_ROOT=$HOME/vcpkg
-cmake -S . -B build -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
-cmake --build build
-```
-
-> The GitHub Actions workflow uses `microsoft/setup-vcpkg@v1`, so no manual steps are required in CI.
+Override the OSAL revision by setting `-DOSAL_GIT_TAG=<ref>` during configuration.
 
 ### Basic Build
 
@@ -237,15 +227,15 @@ cmake -DBUILD_TESTS=ON ..
 
 ```bash
 # Development build
-cmake --preset=Debug -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --preset=Debug
 cmake --build --preset=Debug
 
 # Release build
-cmake --preset=Release -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --preset=Release
 cmake --build --preset=Release
 
 # Coverage build
-cmake --preset=Coverage -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake --preset=Coverage
 cmake --build --preset=Coverage
 ```
 
@@ -413,8 +403,7 @@ make
 ### Unit Tests
 
 ```bash
-cmake -S . -B build -DBUILD_TESTS=ON \
-  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+cmake -S . -B build -DBUILD_TESTS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
@@ -442,7 +431,7 @@ The CI workflow publishes both files as artifacts for every run.
 
 - GitHub Actions workflow: `.github/workflows/ci.yml`
 - Runs on pushes and pull requests targeting `main` or `master`
-- Installs Ninja/lcov, bootstraps vcpkg to fetch OSAL, Unity, and ZeroMQ
+- Installs Ninja/lcov, then configures the project (FetchContent automatically downloads OSAL/Unity)
 - Configures CMake with coverage + test flags, then builds and runs `ctest`
 - Generates the `coverage` target and uploads both LCOV data and HTML reports as artifacts
 

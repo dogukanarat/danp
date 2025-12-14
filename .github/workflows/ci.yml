@@ -26,21 +26,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ninja-build lcov
 
-      - name: Setup vcpkg
-        uses: microsoft/setup-vcpkg@v1
-        with:
-          vcpkgJson: vcpkg.json
-          triplet: x64-linux
-
       - name: Configure CMake
         run: >
           cmake -S . -B $BUILD_DIR
           -G Ninja
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
           -DCMAKE_BUILD_TYPE=Debug
           -DBUILD_TESTS=ON
           -DENABLE_COVERAGE=ON
           -DBUILD_EXAMPLES=OFF
+          -DDANP_ZMQ_SUPPORT=OFF
 
       - name: Build
         run: cmake --build $BUILD_DIR
