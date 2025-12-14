@@ -11,17 +11,8 @@
 
 #include "danp/danp.h"
 #include "unity.h"
-
-/* ============================================================================
- * External Function Declarations
- * ============================================================================
- */
-
-/**
- * @brief Initialize the mock driver for testing
- * @param node_id The local node ID for loopback operation
- */
-void mock_driver_init(uint16_t node_id);
+#include <stdio.h>
+#include <string.h>
 
 /* ============================================================================
  * Test Configuration
@@ -33,6 +24,43 @@ void mock_driver_init(uint16_t node_id);
 #define PORT_A 20        /* First test port */
 #define PORT_B 21        /* Second test port */
 
+static danp_interface_t loopback_iface;
+static bool loopback_registered = false;
+
+static int32_t loopback_tx(void *iface_common, danp_packet_t *packet)
+{
+    danp_interface_t *iface = (danp_interface_t *)iface_common;
+    uint8_t buffer[DANP_HEADER_SIZE + DANP_MAX_PACKET_SIZE];
+
+    memcpy(buffer, &packet->header_raw, DANP_HEADER_SIZE);
+    if (packet->length > 0)
+    {
+        memcpy(buffer + DANP_HEADER_SIZE, packet->payload, packet->length);
+    }
+
+    danp_input(iface, buffer, DANP_HEADER_SIZE + packet->length);
+    return 0;
+}
+
+static void setup_loopback_interface(void)
+{
+    if (!loopback_registered)
+    {
+        memset(&loopback_iface, 0, sizeof(loopback_iface));
+        loopback_iface.name = "TEST_LOOPBACK_DGRAM";
+        loopback_iface.address = TEST_NODE_ID;
+        loopback_iface.mtu = 128;
+        loopback_iface.tx_func = loopback_tx;
+        loopback_iface.next = NULL;
+        danp_register_interface(&loopback_iface);
+        loopback_registered = true;
+    }
+
+    char route_entry[32];
+    int written = snprintf(route_entry, sizeof(route_entry), "%u:%s", TEST_NODE_ID, loopback_iface.name);
+    TEST_ASSERT_TRUE(written > 0 && written < (int)sizeof(route_entry));
+    TEST_ASSERT_EQUAL_INT32(0, danp_route_table_load(route_entry));
+}
 /* ============================================================================
  * Test Setup and Teardown
  * ============================================================================
@@ -41,8 +69,8 @@ void mock_driver_init(uint16_t node_id);
 /**
  * @brief Setup function called before each test
  *
- * Initializes the DANP core and mock driver for loopback testing.
- * The mock driver simulates a network by looping back packets sent
+ * Initializes the DANP core and registers a loopback interface for testing.
+ * The loopback interface simulates a network by feeding packets back
  * to the local node.
  */
 void setUp(void)
@@ -51,8 +79,7 @@ void setUp(void)
     danp_config_t config = {.local_node = TEST_NODE_ID};
     danp_init(&config);
 
-    /* Initialize mock driver in loopback mode */
-    mock_driver_init(TEST_NODE_ID);
+    setup_loopback_interface();
 }
 
 /**
@@ -188,13 +215,42 @@ void test_dgram_socket_creation_and_binding(void)
     TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, socket->state);
 
     /* Bind socket to a specific port */
-    int32_t bind_result = danp_bind(socket, 100);
+    /* Use a port within DANP_MAX_PORTS (64) so binding is valid */
+    const uint16_t test_port = 40;
+    int32_t bind_result = danp_bind(socket, test_port);
 
     /* Verify binding succeeded and port was set */
     TEST_ASSERT_EQUAL(0, bind_result);
-    TEST_ASSERT_EQUAL_UINT16(100, socket->local_port);
+    TEST_ASSERT_EQUAL_UINT16(test_port, socket->local_port);
 
     /* Cleanup */
+    danp_close(socket);
+}
+
+void test_dgram_send_to_rejects_large_payload(void)
+{
+    danp_socket_t *socket = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(socket, PORT_A);
+
+    uint8_t payload[DANP_MAX_PACKET_SIZE];
+    setup_loopback_interface();
+    int32_t rc = danp_send_to(socket, payload, DANP_MAX_PACKET_SIZE, TEST_NODE_ID, PORT_B);
+    TEST_ASSERT_EQUAL_INT32(-1, rc);
+
+    danp_close(socket);
+}
+
+void test_dgram_recv_timeout_returns_error(void)
+{
+    danp_socket_t *socket = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(socket, PORT_A);
+
+    char buffer[8];
+    uint16_t src_node = 0;
+    uint16_t src_port = 0;
+    int32_t rc = danp_recv_from(socket, buffer, sizeof(buffer), &src_node, &src_port, 0);
+    TEST_ASSERT_EQUAL_INT32(-1, rc);
+
     danp_close(socket);
 }
 
@@ -216,6 +272,8 @@ int main(void)
     RUN_TEST(test_dgram_send_recv_same_node);
     RUN_TEST(test_dgram_multiple_messages);
     RUN_TEST(test_dgram_socket_creation_and_binding);
+    RUN_TEST(test_dgram_send_to_rejects_large_payload);
+    RUN_TEST(test_dgram_recv_timeout_returns_error);
 
     return UNITY_END();
 }

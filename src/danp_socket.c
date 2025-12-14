@@ -36,6 +36,29 @@ static osalMutexHandle_t mutex_socket;
 
 static danp_socket_t socket_pool[DANP_MAX_SOCKET_COUNT];
 
+static bool danp_port_in_use(uint16_t port)
+{
+    danp_socket_t *cur = socket_list;
+    size_t guard = 0U;
+
+    while (cur)
+    {
+        if (guard++ >= DANP_MAX_SOCKET_COUNT)
+        {
+            break;
+        }
+
+        if (cur->state != DANP_SOCK_CLOSED && cur->local_port == port)
+        {
+            return true;
+        }
+
+        cur = cur->next;
+    }
+
+    return false;
+}
+
 /* Functions */
 
 /**
@@ -132,7 +155,13 @@ static void danp_send_control(danp_socket_t *sock, uint8_t flags, uint8_t seq_nu
  */
 int32_t danp_socket_init(void)
 {
-    mutex_socket = osalMutexCreate(NULL);
+    osalMutexAttr_t attr = {
+        .name = "danpSocketMutex",
+        .attrBits = OSAL_MUTEX_RECURSIVE,
+        .cbMem = NULL,
+        .cbSize = 0,
+    };
+    mutex_socket = osalMutexCreate(&attr);
     if (!mutex_socket)
     {
         danp_log_message(DANP_LOG_ERROR, "Failed to create socket mutex");
@@ -298,17 +327,48 @@ int32_t danp_bind(danp_socket_t *sock, uint16_t port)
 
         if (port == 0)
         {
-            port = next_ephemeral_port++;
-            if (next_ephemeral_port >= DANP_MAX_PORTS)
+            uint16_t start_port = next_ephemeral_port;
+            do
             {
-                next_ephemeral_port = 1;
+                if (!danp_port_in_use(next_ephemeral_port))
+                {
+                    port = next_ephemeral_port;
+                    next_ephemeral_port++;
+                    if (next_ephemeral_port >= DANP_MAX_PORTS)
+                    {
+                        next_ephemeral_port = 1;
+                    }
+                    break;
+                }
+
+                next_ephemeral_port++;
+                if (next_ephemeral_port >= DANP_MAX_PORTS)
+                {
+                    next_ephemeral_port = 1;
+                }
+            } while (next_ephemeral_port != start_port);
+
+            if (port == 0)
+            {
+                danp_log_message(DANP_LOG_ERROR, "Socket bind failed: no ephemeral ports available");
+                ret = -1;
+                break;
             }
         }
+
         if (port >= DANP_MAX_PORTS)
         {
             ret = -1;
             break;
         }
+
+        if (danp_port_in_use(port))
+        {
+            danp_log_message(DANP_LOG_ERROR, "Socket bind failed: port %u already in use", port);
+            ret = -1;
+            break;
+        }
+
         sock->local_port = port;
         danp_log_message(DANP_LOG_INFO, "Socket bound to port %u", port);
 
@@ -343,6 +403,17 @@ int danp_listen(danp_socket_t *sock, int backlog)
  */
 int32_t danp_close(danp_socket_t *sock)
 {
+    osalStatus_t osal_status;
+    bool is_mutex_taken = false;
+
+    osal_status = osalMutexLock(mutex_socket, OSAL_WAIT_FOREVER);
+    if (osal_status != OSAL_SUCCESS)
+    {
+        danp_log_message(DANP_LOG_ERROR, "Socket close failed: Mutex Lock Error");
+        return -1;
+    }
+    is_mutex_taken = true;
+
     // Only send RST for STREAM sockets or connected DGRAM sockets that are actually in a state where RST makes sense.
     // For DGRAM, we generally don't send RST on close unless we want to signal the peer to stop sending.
     // However, standard UDP doesn't do this. Let's restrict RST to STREAM.
@@ -377,6 +448,11 @@ int32_t danp_close(danp_socket_t *sock)
     sock->local_port = 0;
 
     // Note: Queue and semaphore are kept alive for quick reuse of the slot.
+
+    if (is_mutex_taken)
+    {
+        osalMutexUnlock(mutex_socket);
+    }
 
     return 0;
 }
@@ -681,7 +757,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
             sock->state = DANP_SOCK_SYN_RECEIVED;
 
             danp_buffer_free(pkt);
-            return;
+            break;
         }
 
         if (sock->state == DANP_SOCK_LISTENING && (flags & DANP_FLAG_SYN))

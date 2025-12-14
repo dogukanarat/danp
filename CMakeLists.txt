@@ -66,6 +66,7 @@ add_library(danp::danp ALIAS danp)
 target_sources(danp
     PRIVATE
         src/danp.c
+        src/danp_route.c
         src/danp_socket.c
         src/danp_buffer.c
 )
@@ -176,20 +177,20 @@ install(EXPORT danpTargets
 
 # Generate and install package config files
 configure_package_config_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/danpConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/danpConfig.cmake
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/danp_config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/danp_config.cmake
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/danp
 )
 
 write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/danpConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/danp_config_version.cmake
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 
 install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/danpConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/danpConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/danp_config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/danp_config_version.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/danp
     COMPONENT Development
 )

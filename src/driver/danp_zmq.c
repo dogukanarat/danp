@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <zmq.h>
 
+/* LCOV_EXCL_START */ /* Requires live ZMQ endpoints; excluded from unit coverage */
+
 /* Imports */
 
 
@@ -137,3 +139,5 @@ void danp_zmq_init(
 
     pthread_create((pthread_t*)&iface->rx_thread_id, NULL, zmq_rx_routine, iface);
 }
+
+/* LCOV_EXCL_STOP */

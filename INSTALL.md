@@ -123,15 +123,15 @@ After installation, the following files are available:
 ```
 <prefix>/include/danp/
 ├── danp.h                       # Main API
-├── danpArch.h                   # OS abstraction
-└── danpTypes.h                  # Common types
+├── danp_arch.h                   # OS abstraction
+└── danp_types.h                  # Common types
 ```
 
 ### CMake Configuration
 ```
 <prefix>/lib/cmake/danp/
-├── danpConfig.cmake             # Package config
-├── danpConfigVersion.cmake      # Version info
+├── danp_config.cmake             # Package config
+├── danp_configVersion.cmake      # Version info
 └── danpTargets.cmake            # Import targets
 ```
 

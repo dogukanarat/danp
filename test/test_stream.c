@@ -12,17 +12,8 @@
 
 #include "danp/danp.h"
 #include "unity.h"
-
-/* ============================================================================
- * External Function Declarations
- * ============================================================================
- */
-
-/**
- * @brief Initialize the mock driver for testing
- * @param node_id The local node ID for loopback operation
- */
-void mock_driver_init(uint16_t node_id);
+#include <stdio.h>
+#include <string.h>
 
 /* ============================================================================
  * Test Configuration
@@ -34,6 +25,58 @@ void mock_driver_init(uint16_t node_id);
 #define SERVER_PORT 10    /* Default server port */
 #define CLIENT_PORT 11    /* Default client port */
 
+void danp_log_message_with_func_name(
+    danp_log_level_t level,
+    const char *func_name,
+    const char *message,
+    va_list args);
+
+static danp_interface_t loopback_iface;
+static bool loopback_registered = false;
+
+static int32_t loopback_tx(void *iface_common, danp_packet_t *packet)
+{
+    danp_interface_t *iface = (danp_interface_t *)iface_common;
+    uint8_t buffer[DANP_HEADER_SIZE + DANP_MAX_PACKET_SIZE];
+
+    memcpy(buffer, &packet->header_raw, DANP_HEADER_SIZE);
+    if (packet->length > 0)
+    {
+        memcpy(buffer + DANP_HEADER_SIZE, packet->payload, packet->length);
+    }
+
+    danp_input(iface, buffer, DANP_HEADER_SIZE + packet->length);
+    return 0;
+}
+
+static void setup_loopback_interface(void)
+{
+    if (!loopback_registered)
+    {
+        memset(&loopback_iface, 0, sizeof(loopback_iface));
+        loopback_iface.name = "TEST_LOOPBACK_STREAM";
+        loopback_iface.address = TEST_NODE_ID;
+        loopback_iface.mtu = 128;
+        loopback_iface.tx_func = loopback_tx;
+        loopback_iface.next = NULL;
+        danp_register_interface(&loopback_iface);
+        loopback_registered = true;
+    }
+
+    char route_entry[32];
+    int written = snprintf(route_entry, sizeof(route_entry), "%u:%s", TEST_NODE_ID, loopback_iface.name);
+    TEST_ASSERT_TRUE(written > 0 && written < (int)sizeof(route_entry));
+    TEST_ASSERT_EQUAL_INT32(0, danp_route_table_load(route_entry));
+}
+/* ============================================================================
+ * Test Enable Flags (set to 1 to run, 0 to skip)
+ * ============================================================================
+ */
+#define ENABLE_TEST_STREAM_HANDSHAKE 1
+#define ENABLE_TEST_STREAM_CLOSE_RST 1
+#define ENABLE_TEST_STREAM_SOCKET_STATES 1
+#define ENABLE_TEST_STREAM_BIDIRECTIONAL 1
+
 /* ============================================================================
  * Test Setup and Teardown
  * ============================================================================
@@ -42,18 +85,17 @@ void mock_driver_init(uint16_t node_id);
 /**
  * @brief Setup function called before each test
  *
- * Initializes the DANP core and mock driver for loopback testing.
- * The mock driver simulates a network by looping back packets sent
- * to the local node, enabling synchronous handshake testing.
+ * Initializes the DANP core and registers a loopback interface for testing.
+ * The loopback interface feeds packets back to the local node, enabling
+ * synchronous handshake testing.
  */
 void setUp(void)
 {
     /* Initialize DANP core with test node ID */
-    danp_config_t config = {.local_node = TEST_NODE_ID};
+    danp_config_t config = {.local_node = TEST_NODE_ID, .log_function = danp_log_message_with_func_name};
     danp_init(&config);
 
-    /* Initialize mock driver in loopback mode */
-    mock_driver_init(TEST_NODE_ID);
+    setup_loopback_interface();
 }
 
 /**
@@ -185,10 +227,11 @@ void test_stream_socket_creation_and_states(void)
     TEST_ASSERT_EQUAL(DANP_TYPE_STREAM, socket->type);
     TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, socket->state);
 
-    /* Bind socket to a port */
-    int32_t bind_result = danp_bind(socket, 99);
+    /* Bind socket to a valid port within DANP_MAX_PORTS */
+    const uint16_t test_port = 30;
+    int32_t bind_result = danp_bind(socket, test_port);
     TEST_ASSERT_EQUAL(0, bind_result);
-    TEST_ASSERT_EQUAL_UINT16(99, socket->local_port);
+    TEST_ASSERT_EQUAL_UINT16(test_port, socket->local_port);
 
     /* Put socket in listening state */
     int32_t listen_result = danp_listen(socket, 5);
@@ -256,6 +299,19 @@ void test_stream_bidirectional_communication(void)
     danp_close(server_socket);
 }
 
+void test_stream_accept_timeout_returns_null(void)
+{
+    danp_socket_t *server_socket = danp_socket(DANP_TYPE_STREAM);
+    TEST_ASSERT_NOT_NULL(server_socket);
+    TEST_ASSERT_EQUAL_INT32(0, danp_bind(server_socket, SERVER_PORT));
+    danp_listen(server_socket, 1);
+
+    danp_socket_t *client_socket = danp_accept(server_socket, 0);
+    TEST_ASSERT_NULL(client_socket);
+
+    danp_close(server_socket);
+}
+
 /* ============================================================================
  * Test Runner
  * ============================================================================
@@ -271,10 +327,21 @@ int main(void)
     UNITY_BEGIN();
 
     /* Run all STREAM socket tests */
+#if ENABLE_TEST_STREAM_HANDSHAKE
     RUN_TEST(test_stream_handshake_and_data_transfer);
+#endif
+#if ENABLE_TEST_STREAM_CLOSE_RST
     RUN_TEST(test_stream_close_triggers_rst);
+#endif
+#if ENABLE_TEST_STREAM_SOCKET_STATES
     RUN_TEST(test_stream_socket_creation_and_states);
+#endif
+#if ENABLE_TEST_STREAM_BIDIRECTIONAL
     RUN_TEST(test_stream_bidirectional_communication);
+#endif
+#if ENABLE_TEST_STREAM_BIDIRECTIONAL
+    RUN_TEST(test_stream_accept_timeout_returns_null);
+#endif
 
     return UNITY_END();
 }
