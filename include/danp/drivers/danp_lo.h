@@ -22,15 +22,15 @@ extern "C" {
 
 /* Types */
 
-typedef struct danpLoInterface_s
+typedef struct danp_lo_interface_s
 {
-    danpInterface_t common;
+    danp_interface_t common;
     void *context;
-} danpLoInterface_t;
+} danp_lo_interface_t;
 
 /* External Declarations */
 
-extern int32_t danpLoInit (danpLoInterface_t *iface, uint16_t address);
+extern int32_t danp_lo_init(danp_lo_interface_t *iface, uint16_t address);
 
 #ifdef __cplusplus
 }

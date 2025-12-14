@@ -22,7 +22,7 @@
  * @brief Initialize the mock driver for testing
  * @param node_id The local node ID for loopback operation
  */
-void mockDriverInit(uint16_t node_id);
+void mock_driver_init(uint16_t node_id);
 
 /* ============================================================================
  * Test Configuration
@@ -49,11 +49,11 @@ void mockDriverInit(uint16_t node_id);
 void setUp(void)
 {
     /* Initialize DANP core with test node ID */
-    danpConfig_t config = {.localNode = TEST_NODE_ID};
-    danpInit(&config);
+    danp_config_t config = {.local_node = TEST_NODE_ID};
+    danp_init(&config);
 
     /* Initialize mock driver in loopback mode */
-    mockDriverInit(TEST_NODE_ID);
+    mock_driver_init(TEST_NODE_ID);
 }
 
 /**
@@ -85,46 +85,46 @@ void tearDown(void)
 void test_stream_handshake_and_data_transfer(void)
 {
     /* Step 1: Create and setup server socket */
-    danpSocket_t *server_socket = danpSocket(DANP_TYPE_STREAM);
+    danp_socket_t *server_socket = danp_socket(DANP_TYPE_STREAM);
     TEST_ASSERT_NOT_NULL(server_socket);
-    TEST_ASSERT_EQUAL(0, danpBind(server_socket, SERVER_PORT));
-    danpListen(server_socket, 5);
+    TEST_ASSERT_EQUAL(0, danp_bind(server_socket, SERVER_PORT));
+    danp_listen(server_socket, 5);
 
     /* Step 2: Create and setup client socket */
-    danpSocket_t *client_socket = danpSocket(DANP_TYPE_STREAM);
+    danp_socket_t *client_socket = danp_socket(DANP_TYPE_STREAM);
     TEST_ASSERT_NOT_NULL(client_socket);
-    danpBind(client_socket, CLIENT_PORT);
+    danp_bind(client_socket, CLIENT_PORT);
 
     /* Step 3: Client initiates connection (blocking) */
     /* The mock loopback driver handles SYN -> SYN-ACK -> ACK synchronously */
-    int32_t connect_result = danpConnect(client_socket, TEST_NODE_ID, SERVER_PORT);
+    int32_t connect_result = danp_connect(client_socket, TEST_NODE_ID, SERVER_PORT);
     TEST_ASSERT_EQUAL(0, connect_result);
     TEST_ASSERT_EQUAL(DANP_SOCK_ESTABLISHED, client_socket->state);
 
     /* Step 4: Server accepts the incoming connection */
-    danpSocket_t *accepted_socket = danpAccept(server_socket, DANP_WAIT_FOREVER);
+    danp_socket_t *accepted_socket = danp_accept(server_socket, DANP_WAIT_FOREVER);
     TEST_ASSERT_NOT_NULL(accepted_socket);
     TEST_ASSERT_EQUAL(DANP_SOCK_ESTABLISHED, accepted_socket->state);
-    TEST_ASSERT_EQUAL(TEST_NODE_ID, accepted_socket->remoteNode);
-    TEST_ASSERT_EQUAL(CLIENT_PORT, accepted_socket->remotePort);
+    TEST_ASSERT_EQUAL(TEST_NODE_ID, accepted_socket->remote_node);
+    TEST_ASSERT_EQUAL(CLIENT_PORT, accepted_socket->remote_port);
 
     /* Step 5: Client sends data reliably */
     const char *payload = "SecureData";
-    int32_t bytes_sent = danpSend(client_socket, (void *)payload, 10);
+    int32_t bytes_sent = danp_send(client_socket, (void *)payload, 10);
     TEST_ASSERT_EQUAL(10, bytes_sent);
 
     /* Step 6: Server receives the data */
     char buffer[32];
-    int32_t bytes_received = danpRecv(accepted_socket, buffer, 32, DANP_WAIT_FOREVER);
+    int32_t bytes_received = danp_recv(accepted_socket, buffer, 32, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(10, bytes_received);
     buffer[bytes_received] = 0;
     TEST_ASSERT_EQUAL_STRING("SecureData", buffer);
 
     /* Step 7: Verify sequence numbers (RDP internal state) */
     /* Client sent 1 packet, so transmit sequence should be 1 */
-    TEST_ASSERT_EQUAL(1, client_socket->txSeq);
+    TEST_ASSERT_EQUAL(1, client_socket->tx_seq);
     /* Server received 1 packet, so expected receive sequence should be 1 */
-    TEST_ASSERT_EQUAL(1, accepted_socket->rxExpectedSeq);
+    TEST_ASSERT_EQUAL(1, accepted_socket->rx_expected_seq);
 }
 
 /**
@@ -141,21 +141,21 @@ void test_stream_handshake_and_data_transfer(void)
 void test_stream_close_triggers_rst(void)
 {
     /* Step 1: Create and connect sockets */
-    danpSocket_t *server_socket = danpSocket(DANP_TYPE_STREAM);
-    danpBind(server_socket, 12);
-    danpListen(server_socket, 5);
+    danp_socket_t *server_socket = danp_socket(DANP_TYPE_STREAM);
+    danp_bind(server_socket, 12);
+    danp_listen(server_socket, 5);
 
-    danpSocket_t *client_socket = danpSocket(DANP_TYPE_STREAM);
-    danpBind(client_socket, 13);
-    int32_t connect_result = danpConnect(client_socket, TEST_NODE_ID, 12);
+    danp_socket_t *client_socket = danp_socket(DANP_TYPE_STREAM);
+    danp_bind(client_socket, 13);
+    int32_t connect_result = danp_connect(client_socket, TEST_NODE_ID, 12);
     TEST_ASSERT_EQUAL(0, connect_result);
 
-    danpSocket_t *accepted_socket = danpAccept(server_socket, DANP_WAIT_FOREVER);
+    danp_socket_t *accepted_socket = danp_accept(server_socket, DANP_WAIT_FOREVER);
     TEST_ASSERT_NOT_NULL(accepted_socket);
     TEST_ASSERT_EQUAL(DANP_SOCK_ESTABLISHED, accepted_socket->state);
 
     /* Step 2: Close client socket (triggers RST) */
-    danpClose(client_socket);
+    danp_close(client_socket);
 
     /* Step 3: Verify server socket receives RST and transitions to CLOSED */
     /* The RST packet is looped back immediately through the mock driver,
@@ -163,7 +163,7 @@ void test_stream_close_triggers_rst(void)
     TEST_ASSERT_EQUAL(DANP_SOCK_CLOSED, accepted_socket->state);
 
     /* Cleanup */
-    danpClose(server_socket);
+    danp_close(server_socket);
 }
 
 /**
@@ -178,7 +178,7 @@ void test_stream_close_triggers_rst(void)
 void test_stream_socket_creation_and_states(void)
 {
     /* Create a stream socket */
-    danpSocket_t *socket = danpSocket(DANP_TYPE_STREAM);
+    danp_socket_t *socket = danp_socket(DANP_TYPE_STREAM);
 
     /* Verify socket creation succeeded with correct type and state */
     TEST_ASSERT_NOT_NULL(socket);
@@ -186,17 +186,17 @@ void test_stream_socket_creation_and_states(void)
     TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, socket->state);
 
     /* Bind socket to a port */
-    int32_t bind_result = danpBind(socket, 99);
+    int32_t bind_result = danp_bind(socket, 99);
     TEST_ASSERT_EQUAL(0, bind_result);
-    TEST_ASSERT_EQUAL_UINT16(99, socket->localPort);
+    TEST_ASSERT_EQUAL_UINT16(99, socket->local_port);
 
     /* Put socket in listening state */
-    int32_t listen_result = danpListen(socket, 5);
+    int32_t listen_result = danp_listen(socket, 5);
     TEST_ASSERT_EQUAL(0, listen_result);
     TEST_ASSERT_EQUAL(DANP_SOCK_LISTENING, socket->state);
 
     /* Cleanup */
-    danpClose(socket);
+    danp_close(socket);
 }
 
 /**
@@ -214,25 +214,25 @@ void test_stream_socket_creation_and_states(void)
 void test_stream_bidirectional_communication(void)
 {
     /* Step 1: Setup and establish connection */
-    danpSocket_t *server_socket = danpSocket(DANP_TYPE_STREAM);
-    danpBind(server_socket, 14);
-    danpListen(server_socket, 5);
+    danp_socket_t *server_socket = danp_socket(DANP_TYPE_STREAM);
+    danp_bind(server_socket, 14);
+    danp_listen(server_socket, 5);
 
-    danpSocket_t *client_socket = danpSocket(DANP_TYPE_STREAM);
-    danpBind(client_socket, 15);
-    danpConnect(client_socket, TEST_NODE_ID, 14);
+    danp_socket_t *client_socket = danp_socket(DANP_TYPE_STREAM);
+    danp_bind(client_socket, 15);
+    danp_connect(client_socket, TEST_NODE_ID, 14);
 
-    danpSocket_t *accepted_socket = danpAccept(server_socket, DANP_WAIT_FOREVER);
+    danp_socket_t *accepted_socket = danp_accept(server_socket, DANP_WAIT_FOREVER);
     TEST_ASSERT_NOT_NULL(accepted_socket);
 
     /* Step 2: Client sends data to server */
     const char *client_message = "ClientData";
-    int32_t client_bytes_sent = danpSend(client_socket, (void *)client_message, 10);
+    int32_t client_bytes_sent = danp_send(client_socket, (void *)client_message, 10);
     TEST_ASSERT_EQUAL(10, client_bytes_sent);
 
     /* Step 3: Server receives data from client */
     char server_buffer[32];
-    int32_t server_bytes_received = danpRecv(
+    int32_t server_bytes_received = danp_recv(
         accepted_socket, server_buffer, 32, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(10, server_bytes_received);
     server_buffer[server_bytes_received] = '\0';
@@ -240,20 +240,20 @@ void test_stream_bidirectional_communication(void)
 
     /* Step 4: Server sends data to client */
     const char *server_message = "ServerData";
-    int32_t server_bytes_sent = danpSend(accepted_socket, (void *)server_message, 10);
+    int32_t server_bytes_sent = danp_send(accepted_socket, (void *)server_message, 10);
     TEST_ASSERT_EQUAL(10, server_bytes_sent);
 
     /* Step 5: Client receives data from server */
     char client_buffer[32];
-    int32_t client_bytes_received = danpRecv(
+    int32_t client_bytes_received = danp_recv(
         client_socket, client_buffer, 32, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(10, client_bytes_received);
     client_buffer[client_bytes_received] = '\0';
     TEST_ASSERT_EQUAL_STRING("ServerData", client_buffer);
 
     /* Cleanup */
-    danpClose(client_socket);
-    danpClose(server_socket);
+    danp_close(client_socket);
+    danp_close(server_socket);
 }
 
 /* ============================================================================

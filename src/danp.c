@@ -6,14 +6,14 @@
 
 #include "osal/osal.h"
 #include "danp/danp.h"
-#include "danp/danpBuffer.h"
-#include "danpDebug.h"
+#include "danp/danp_buffer.h"
+#include "danp_debug.h"
 #include <stdarg.h>
 #include <stdio.h>
 
 /* Imports */
 
-extern void danpSocketInputHandler(danpPacket_t *pkt);
+extern void danp_socket_input_handler(danp_packet_t *pkt);
 
 /* Definitions */
 
@@ -27,10 +27,10 @@ extern void danpSocketInputHandler(danpPacket_t *pkt);
 /* Variables */
 
 /** @brief List of registered network interfaces. */
-static danpInterface_t *IfaceList = NULL;
+static danp_interface_t *iface_list = NULL;
 
 /** @brief Global configuration structure. */
-danpConfig_t DanpConfig;
+danp_config_t danp_config;
 
 /* Functions */
 
@@ -39,17 +39,17 @@ danpConfig_t DanpConfig;
  * @param prio Packet priority.
  * @param dst Destination node address.
  * @param src Source node address.
- * @param dstPort Destination port.
- * @param srcPort Source port.
+ * @param dst_port Destination port.
+ * @param src_port Source port.
  * @param flags Packet flags.
  * @return Packed header as a 32-bit integer.
  */
-uint32_t danpPackHeader(
+uint32_t danp_pack_header(
     uint8_t prio,
     uint16_t dst,
     uint16_t src,
-    uint8_t dstPort,
-    uint8_t srcPort,
+    uint8_t dst_port,
+    uint8_t src_port,
     uint8_t flags)
 {
     uint32_t h = 0;
@@ -64,8 +64,8 @@ uint32_t danpPackHeader(
     // Standard fields
     h |= (uint32_t)(dst & 0xFF) << 22;
     h |= (uint32_t)(src & 0xFF) << 14;
-    h |= (uint32_t)(dstPort & 0x3F) << 8;
-    h |= (uint32_t)(srcPort & 0x3F) << 2;
+    h |= (uint32_t)(dst_port & 0x3F) << 8;
+    h |= (uint32_t)(src_port & 0x3F) << 2;
 
     h |= (uint32_t)(flags & 0x03);
 
@@ -77,22 +77,22 @@ uint32_t danpPackHeader(
  * @param raw Raw 32-bit header.
  * @param dst Pointer to store destination node address.
  * @param src Pointer to store source node address.
- * @param dstPort Pointer to store destination port.
- * @param srcPort Pointer to store source port.
+ * @param dst_port Pointer to store destination port.
+ * @param src_port Pointer to store source port.
  * @param flags Pointer to store packet flags.
  */
-void danpUnpackHeader(
+void danp_unpack_header(
     uint32_t raw,
     uint16_t *dst,
     uint16_t *src,
-    uint8_t *dstPort,
-    uint8_t *srcPort,
+    uint8_t *dst_port,
+    uint8_t *src_port,
     uint8_t *flags)
 {
     *dst = (raw >> 22) & 0xFF;
     *src = (raw >> 14) & 0xFF;
-    *dstPort = (raw >> 8) & 0x3F;
-    *srcPort = (raw >> 2) & 0x3F;
+    *dst_port = (raw >> 8) & 0x3F;
+    *src_port = (raw >> 2) & 0x3F;
 
     uint8_t f = (raw) & 0x03;
 
@@ -108,13 +108,13 @@ void danpUnpackHeader(
  * @brief Initialize the DANP library.
  * @param config Pointer to the configuration structure.
  */
-void danpInit(const danpConfig_t *config)
+void danp_init(const danp_config_t *config)
 {
     for (;;)
     {
-        memcpy(&DanpConfig, config, sizeof(danpConfig_t));
-        danpSocketInit();
-        danpBufferInit();
+        memcpy(&danp_config, config, sizeof(danp_config_t));
+        danp_socket_init();
+        danp_buffer_init();
 
         break;
     }
@@ -125,51 +125,51 @@ void danpInit(const danpConfig_t *config)
  * @brief Register a network interface.
  * @param iface Pointer to the interface to register.
  */
-void danpRegisterInterface(void *iface)
+void danp_register_interface(void *iface)
 {
-    danpInterface_t *ifaceCommon = iface;
-    if (!ifaceCommon)
+    danp_interface_t *iface_common = iface;
+    if (!iface_common)
     {
-        danpLogMessage(DANP_LOG_ERROR, "Cannot register NULL interface");
+        danp_log_message(DANP_LOG_ERROR, "Cannot register NULL interface");
         return;
     }
-    if (!ifaceCommon->txFunc)
+    if (!iface_common->tx_func)
     {
-        danpLogMessage(DANP_LOG_ERROR, "Interface txFunc is NULL, cannot register");
+        danp_log_message(DANP_LOG_ERROR, "Interface tx_func is NULL, cannot register");
         return;
     }
-    if (!ifaceCommon->name)
+    if (!iface_common->name)
     {
-        danpLogMessage(DANP_LOG_ERROR, "Interface name is NULL, cannot register");
+        danp_log_message(DANP_LOG_ERROR, "Interface name is NULL, cannot register");
         return;
     }
-    if (ifaceCommon->mtu == 0)
+    if (iface_common->mtu == 0)
     {
-        danpLogMessage(DANP_LOG_ERROR, "Interface MTU is zero, cannot register");
+        danp_log_message(DANP_LOG_ERROR, "Interface MTU is zero, cannot register");
         return;
     }
-    if (!IfaceList)
+    if (!iface_list)
     {
-        danpLogMessage(DANP_LOG_INFO, "Registering first network interface: %s", ifaceCommon->name);
+        danp_log_message(DANP_LOG_INFO, "Registering first network interface: %s", iface_common->name);
     }
     else
     {
-        danpLogMessage(DANP_LOG_INFO, "Registering network interface: %s", ifaceCommon->name);
+        danp_log_message(DANP_LOG_INFO, "Registering network interface: %s", iface_common->name);
     }
-    ifaceCommon->next = IfaceList;
-    IfaceList = iface;
-    danpLogMessage(DANP_LOG_VERBOSE, "Registered network interface");
+    iface_common->next = iface_list;
+    iface_list = iface;
+    danp_log_message(DANP_LOG_VERBOSE, "Registered network interface");
 }
 
 /**
  * @brief Lookup the route for a destination node.
- * @param destNodeId Destination node ID.
+ * @param dest_node_id Destination node ID.
  * @return Pointer to the interface to use, or NULL if no route found.
  */
-static danpInterface_t *danpRouteLookup(uint16_t destNodeId)
+static danp_interface_t *danp_route_lookup(uint16_t dest_node_id)
 {
-    (void)destNodeId; // Mark parameter as unused
-    return IfaceList;
+    (void)dest_node_id; // Mark parameter as unused
+    return iface_list;
 }
 
 /**
@@ -177,69 +177,69 @@ static danpInterface_t *danpRouteLookup(uint16_t destNodeId)
  * @param pkt Pointer to the packet to route.
  * @return 0 on success, negative on error.
  */
-int32_t danpRouteTx(danpPacket_t *pkt)
+int32_t danp_route_tx(danp_packet_t *pkt)
 {
     uint16_t dst, src;
-    uint8_t dstPort, srcPort, flags;
-    danpUnpackHeader(pkt->headerRaw, &dst, &src, &dstPort, &srcPort, &flags);
+    uint8_t dst_port, src_port, flags;
+    danp_unpack_header(pkt->header_raw, &dst, &src, &dst_port, &src_port, &flags);
 
-    danpInterface_t *out = danpRouteLookup(dst);
+    danp_interface_t *out = danp_route_lookup(dst);
     if (!out)
     {
-        danpLogMessage(DANP_LOG_ERROR, "No route to destination");
+        danp_log_message(DANP_LOG_ERROR, "No route to destination");
         return -1;
     }
-    danpLogMessage(
+    danp_log_message(
         DANP_LOG_DEBUG,
         "TX [dst]=%u, [src]=%u, [dPort]=%u, [sPort]=%u, [flags]=0x%02X, [len]=%u, [iface]=%s",
         dst,
         src,
-        dstPort,
-        srcPort,
+        dst_port,
+        src_port,
         flags,
         pkt->length,
         out->name);
-    return out->txFunc(out, pkt);
+    return out->tx_func(out, pkt);
 }
 
 /**
  * @brief Process incoming data from an interface.
  * @param iface Pointer to the interface receiving data.
- * @param rawData Pointer to the received data.
+ * @param raw_data Pointer to the received data.
  * @param len Length of the received data.
  */
-void danpInput(danpInterface_t *iface, uint8_t *rawData, uint16_t len)
+void danp_input(danp_interface_t *iface, uint8_t *raw_data, uint16_t len)
 {
     if (len < DANP_HEADER_SIZE)
     {
-        danpLogMessage(DANP_LOG_WARN, "Received packet too short, dropping");
+        danp_log_message(DANP_LOG_WARN, "Received packet too short, dropping");
         return;
     }
-    danpPacket_t *pkt = danpBufferAllocate();
+    danp_packet_t *pkt = danp_buffer_allocate();
     if (!pkt)
     {
-        danpLogMessage(DANP_LOG_ERROR, "No memory for incoming packet, dropping");
+        danp_log_message(DANP_LOG_ERROR, "No memory for incoming packet, dropping");
         return;
     }
-    memcpy(&pkt->headerRaw, rawData, 4);
+    memcpy(&pkt->header_raw, raw_data, 4);
     pkt->length = len - 4;
     if (pkt->length > 0)
     {
-        memcpy(pkt->payload, rawData + 4, pkt->length);
+        memcpy(pkt->payload, raw_data + 4, pkt->length);
     }
-    pkt->rxInterface = iface;
+    pkt->rx_interface = iface;
 
     uint16_t dst, src;
-    uint8_t dstPort, srcPort, flags;
-    danpUnpackHeader(pkt->headerRaw, &dst, &src, &dstPort, &srcPort, &flags);
+    uint8_t dst_port, src_port, flags;
+    danp_unpack_header(pkt->header_raw, &dst, &src, &dst_port, &src_port, &flags);
 
-    danpLogMessage(
+    danp_log_message(
         DANP_LOG_DEBUG,
         "RX [dst]=%u [src]=%u [dPort]=%u [sPort]=%u [flags]=0x%02X [len]=%u, [iface]=%s",
         dst,
         src,
-        dstPort,
-        srcPort,
+        dst_port,
+        src_port,
         flags,
         pkt->length,
         iface->name
@@ -247,30 +247,30 @@ void danpInput(danpInterface_t *iface, uint8_t *rawData, uint16_t len)
 
     if (dst == iface->address)
     {
-        danpLogMessage(DANP_LOG_VERBOSE, "Packet received for local node");
-        danpSocketInputHandler(pkt);
+        danp_log_message(DANP_LOG_VERBOSE, "Packet received for local node");
+        danp_socket_input_handler(pkt);
     }
     else
     {
-        danpLogMessage(DANP_LOG_INFO, "Packet not for local node, dropping");
-        danpBufferFree(pkt);
+        danp_log_message(DANP_LOG_INFO, "Packet not for local node, dropping");
+        danp_buffer_free(pkt);
     }
 }
 
 /**
  * @brief Log a message using the registered callback.
  * @param level Log level.
- * @param funcName Name of the function.
+ * @param func_name Name of the function.
  * @param message Message format string.
  * @param ... Variable arguments.
  */
-void danpLogMessageHandler(danpLogLevel_t level, const char *funcName, const char *message, ...)
+void danp_log_message_handler(danp_log_level_t level, const char *func_name, const char *message, ...)
 {
-    if (DanpConfig.logFunction)
+    if (danp_config.log_function)
     {
         va_list args;
         va_start(args, message);
-        DanpConfig.logFunction(level, funcName, message, args);
+        danp_config.log_function(level, func_name, message, args);
         va_end(args);
     }
 }

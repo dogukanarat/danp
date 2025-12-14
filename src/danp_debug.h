@@ -19,8 +19,8 @@ extern "C"
 
 /* Definitions */
 
-#define danpLogMessage(level, message, ...)                                                        \
-    danpLogMessageHandler(level, __func__, message, ##__VA_ARGS__)
+#define danp_log_message(level, message, ...)                                                        \
+    danp_log_message_handler(level, __func__, message, ##__VA_ARGS__)
 
 /* Types */
 
@@ -28,7 +28,7 @@ extern "C"
 /* External Declarations */
 
 extern void
-danpLogMessageHandler(danpLogLevel_t level, const char *funcName, const char *message, ...);
+danp_log_message_handler(danp_log_level_t level, const char *func_name, const char *message, ...);
 
 
 #ifdef __cplusplus

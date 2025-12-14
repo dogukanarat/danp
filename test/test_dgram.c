@@ -21,7 +21,7 @@
  * @brief Initialize the mock driver for testing
  * @param node_id The local node ID for loopback operation
  */
-void mockDriverInit(uint16_t node_id);
+void mock_driver_init(uint16_t node_id);
 
 /* ============================================================================
  * Test Configuration
@@ -48,11 +48,11 @@ void mockDriverInit(uint16_t node_id);
 void setUp(void)
 {
     /* Initialize DANP core with test node ID */
-    danpConfig_t config = {.localNode = TEST_NODE_ID};
-    danpInit(&config);
+    danp_config_t config = {.local_node = TEST_NODE_ID};
+    danp_init(&config);
 
     /* Initialize mock driver in loopback mode */
-    mockDriverInit(TEST_NODE_ID);
+    mock_driver_init(TEST_NODE_ID);
 }
 
 /**
@@ -80,16 +80,16 @@ void tearDown(void)
 void test_dgram_send_recv_same_node(void)
 {
     /* Create and bind socket A */
-    danpSocket_t *socket_a = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(socket_a, PORT_A);
+    danp_socket_t *socket_a = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(socket_a, PORT_A);
 
     /* Create and bind socket B */
-    danpSocket_t *socket_b = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(socket_b, PORT_B);
+    danp_socket_t *socket_b = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(socket_b, PORT_B);
 
     /* Send message from socket A to socket B */
     const char *message = "HelloUnity";
-    int32_t bytes_sent = danpSendTo(socket_a, (void *)message, 10, TEST_NODE_ID, PORT_B);
+    int32_t bytes_sent = danp_send_to(socket_a, (void *)message, 10, TEST_NODE_ID, PORT_B);
     TEST_ASSERT_EQUAL(10, bytes_sent);
 
     /* Receive message at socket B */
@@ -97,7 +97,7 @@ void test_dgram_send_recv_same_node(void)
     uint16_t source_node, source_port;
 
     /* Note: Mock driver is synchronous, so message is immediately available */
-    int32_t bytes_received = danpRecvFrom(
+    int32_t bytes_received = danp_recv_from(
         socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
 
     /* Verify received data matches sent data */
@@ -110,8 +110,8 @@ void test_dgram_send_recv_same_node(void)
     TEST_ASSERT_EQUAL(PORT_A, source_port);
 
     /* Cleanup sockets */
-    danpClose(socket_a);
-    danpClose(socket_b);
+    danp_close(socket_a);
+    danp_close(socket_b);
 }
 
 /**
@@ -123,49 +123,49 @@ void test_dgram_send_recv_same_node(void)
 void test_dgram_multiple_messages(void)
 {
     /* Create and bind sockets */
-    danpSocket_t *socket_a = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(socket_a, PORT_A);
+    danp_socket_t *socket_a = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(socket_a, PORT_A);
 
-    danpSocket_t *socket_b = danpSocket(DANP_TYPE_DGRAM);
-    danpBind(socket_b, PORT_B);
+    danp_socket_t *socket_b = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(socket_b, PORT_B);
 
     /* Send three different messages in sequence */
     const char *message_1 = "First";
     const char *message_2 = "Second";
     const char *message_3 = "Third";
 
-    danpSendTo(socket_a, (void *)message_1, 5, TEST_NODE_ID, PORT_B);
-    danpSendTo(socket_a, (void *)message_2, 6, TEST_NODE_ID, PORT_B);
-    danpSendTo(socket_a, (void *)message_3, 5, TEST_NODE_ID, PORT_B);
+    danp_send_to(socket_a, (void *)message_1, 5, TEST_NODE_ID, PORT_B);
+    danp_send_to(socket_a, (void *)message_2, 6, TEST_NODE_ID, PORT_B);
+    danp_send_to(socket_a, (void *)message_3, 5, TEST_NODE_ID, PORT_B);
 
     /* Receive and verify all three messages */
     char buffer[32];
     uint16_t source_node, source_port;
 
     /* Receive first message */
-    int32_t received_1 = danpRecvFrom(
+    int32_t received_1 = danp_recv_from(
         socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(5, received_1);
     buffer[received_1] = '\0';
     TEST_ASSERT_EQUAL_STRING("First", buffer);
 
     /* Receive second message */
-    int32_t received_2 = danpRecvFrom(
+    int32_t received_2 = danp_recv_from(
         socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(6, received_2);
     buffer[received_2] = '\0';
     TEST_ASSERT_EQUAL_STRING("Second", buffer);
 
     /* Receive third message */
-    int32_t received_3 = danpRecvFrom(
+    int32_t received_3 = danp_recv_from(
         socket_b, buffer, 32, &source_node, &source_port, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(5, received_3);
     buffer[received_3] = '\0';
     TEST_ASSERT_EQUAL_STRING("Third", buffer);
 
     /* Cleanup sockets */
-    danpClose(socket_a);
-    danpClose(socket_b);
+    danp_close(socket_a);
+    danp_close(socket_b);
 }
 
 /**
@@ -180,7 +180,7 @@ void test_dgram_multiple_messages(void)
 void test_dgram_socket_creation_and_binding(void)
 {
     /* Create a datagram socket */
-    danpSocket_t *socket = danpSocket(DANP_TYPE_DGRAM);
+    danp_socket_t *socket = danp_socket(DANP_TYPE_DGRAM);
 
     /* Verify socket was created successfully */
     TEST_ASSERT_NOT_NULL(socket);
@@ -188,14 +188,14 @@ void test_dgram_socket_creation_and_binding(void)
     TEST_ASSERT_EQUAL(DANP_SOCK_OPEN, socket->state);
 
     /* Bind socket to a specific port */
-    int32_t bind_result = danpBind(socket, 100);
+    int32_t bind_result = danp_bind(socket, 100);
 
     /* Verify binding succeeded and port was set */
     TEST_ASSERT_EQUAL(0, bind_result);
-    TEST_ASSERT_EQUAL_UINT16(100, socket->localPort);
+    TEST_ASSERT_EQUAL_UINT16(100, socket->local_port);
 
     /* Cleanup */
-    danpClose(socket);
+    danp_close(socket);
 }
 
 /* ============================================================================

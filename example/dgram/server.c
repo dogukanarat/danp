@@ -1,6 +1,7 @@
 /* server.c - DGRAM Server Example */
 
-#include "../exampleDefinitions.h"
+#include "../example_definitions.h"
+#include "danp/drivers/danp_zmq.h"
 #include "danp/danp.h"
 #include "osal/osal.h"
 #include <assert.h>
@@ -15,7 +16,7 @@ extern void danpZmqInit(
     int subCount,
     uint16_t nodeId);
 extern void danpLogMessageCallback(
-    danpLogLevel_t level,
+    danp_log_level_t level,
     const char *funcName,
     const char *message,
     va_list args);
@@ -25,8 +26,8 @@ void taskEchoServer(void *arg)
     printf("[Server] Echo server starting...\n");
 
     // Create Socket (DGRAM)
-    danpSocket_t *sockDgram = danpSocket(DANP_TYPE_DGRAM);
-    int32_t bindResult = danpBind(sockDgram, DGRAM_PORT);
+    danp_socket_t *sock_dgram = danp_socket(DANP_TYPE_DGRAM);
+    int32_t bindResult = danp_bind(sock_dgram, DGRAM_PORT);
     assert(bindResult == 0);
 
     printf("[Server] Listening dgram on port %d\n", DGRAM_PORT);
@@ -37,8 +38,8 @@ void taskEchoServer(void *arg)
         char dgramBuf[64];
         uint16_t dgramSrcNode, dgramSrcPort;
         // printf("[Server] Waiting for message...\n");
-        int32_t dgramLen = danpRecvFrom(
-            sockDgram,
+        int32_t dgramLen = danp_recv_from(
+            sock_dgram,
             dgramBuf,
             sizeof(dgramBuf) - 1,
             &dgramSrcNode,
@@ -50,7 +51,7 @@ void taskEchoServer(void *arg)
             printf("[Server] Recv DGRAM: %s\n", dgramBuf);
 
             // Echo back to sender
-            danpSendTo(sockDgram, dgramBuf, dgramLen, dgramSrcNode, dgramSrcPort);
+            danp_send_to(sock_dgram, dgramBuf, dgramLen, dgramSrcNode, dgramSrcPort);
         }
         else
         {
@@ -63,12 +64,14 @@ void taskEchoServer(void *arg)
 int main(int argc, char **argv)
 {
     const char *subEndpoints[] = {"tcp://localhost:5556"};
-    danpZmqInit("tcp://*:5555", subEndpoints, 1, NODE_SERVER);
-    danpConfig_t config = {
-        .localNode = NODE_SERVER,
-        .logFunction = danpLogMessageCallback,
+    danp_zmq_interface_t zmq_iface = {0};
+    danp_zmq_init(&zmq_iface, "tcp://*:5555", subEndpoints, 1, NODE_SERVER);
+    danp_register_interface((danp_interface_t *)&zmq_iface);
+    danp_config_t config = {
+        .local_node = NODE_SERVER,
+        .log_function = danpLogMessageCallback,
     };
-    danpInit(&config);
+    danp_init(&config);
     osalThreadAttr_t threadAttr = {
         .name = "EchoServer",
         .stackSize = 2048,

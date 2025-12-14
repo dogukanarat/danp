@@ -66,13 +66,13 @@ add_library(danp::danp ALIAS danp)
 target_sources(danp
     PRIVATE
         src/danp.c
-        src/danpSocket.c
-        src/danpBuffer.c
+        src/danp_socket.c
+        src/danp_buffer.c
 )
 
 # Driver sources
 if(DANP_ZMQ_SUPPORT)
-    target_sources(danp PRIVATE src/driver/danpZmq.c)
+    target_sources(danp PRIVATE src/driver/danp_zmq.c)
 endif()
 
 # ============================================================================
