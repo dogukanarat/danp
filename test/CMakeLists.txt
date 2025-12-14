@@ -22,15 +22,14 @@ function(danp_add_test TEST_NAME)
         "ADDITIONAL_SOURCES"
         ${ARGN}
     )
-    
+
     # Create test executable
     add_executable(${TEST_NAME}
         ${ARG_SOURCE}
         ${ARG_ADDITIONAL_SOURCES}
-        mock_driver.c
         log_message.c
     )
-    
+
     # Link against library and dependencies
     target_link_libraries(${TEST_NAME}
         PRIVATE
@@ -38,16 +37,16 @@ function(danp_add_test TEST_NAME)
             unity
             Threads::Threads
     )
-    
+
     # Add include directory for test-specific headers
     target_include_directories(${TEST_NAME}
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
     )
-    
+
     # Register with CTest
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
-    
+
     # Set test properties
     set_tests_properties(${TEST_NAME} PROPERTIES
         TIMEOUT 30
@@ -61,6 +60,7 @@ endfunction()
 danp_add_test(test_core SOURCE test_core.c)
 danp_add_test(test_dgram SOURCE test_dgram.c)
 danp_add_test(test_stream SOURCE test_stream.c)
+danp_add_test(test_route SOURCE test_route.c)
 
 # ============================================================================
 # Code Coverage Target
@@ -77,7 +77,6 @@ if(ENABLE_COVERAGE)
         EXCLUDE
             'test/*'
             'unity/*'
-            '*/mock_driver.c'
             '*/log_message.c'
     )
 

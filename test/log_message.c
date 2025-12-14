@@ -48,7 +48,7 @@ void danp_log_message_with_func_name(
     danp_log_level_t level,
     const char *func_name,
     const char *message,
-    ...)
+    va_list args)
 {
     const char *level_str = "UNKNOWN";
     const char *color_start = "";
@@ -96,10 +96,7 @@ void danp_log_message_with_func_name(
         color_end);
 
     /* Print the actual log message with variable arguments */
-    va_list args;
-    va_start(args, message);
     vprintf(message, args);
-    va_end(args);
 
     /* Add newline */
     printf("\n");

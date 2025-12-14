@@ -249,7 +249,7 @@ void danp_unpack_header(
  * @param message Message format string.
  * @param ... Variable arguments.
  */
-void danp_log_message(danp_log_level_t level, const char *func_name, const char *message, ...);
+void danp_log_message_handler(danp_log_level_t level, const char *func_name, const char *message, ...);
 
 /**
  * @brief Route a packet for transmission.
@@ -257,6 +257,17 @@ void danp_log_message(danp_log_level_t level, const char *func_name, const char 
  * @return 0 on success, negative on error.
  */
 int32_t danp_route_tx(danp_packet_t *packet);
+
+/**
+ * @brief Load a static routing table from a string.
+ *
+ * The table string uses comma or newline separated entries with the format
+ * "<destination_node>:<interface_name>". Whitespace around tokens is ignored.
+ *
+ * @param table Routing table string (e.g., "1:if0, 42:backbone\n100:radio").
+ * @return 0 on success, negative on error.
+ */
+int32_t danp_route_table_load(const char *table);
 
 /**
  * @brief Process incoming data from an interface.

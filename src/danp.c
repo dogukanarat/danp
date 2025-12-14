@@ -26,9 +26,6 @@ extern void danp_socket_input_handler(danp_packet_t *pkt);
 
 /* Variables */
 
-/** @brief List of registered network interfaces. */
-static danp_interface_t *iface_list = NULL;
-
 /** @brief Global configuration structure. */
 danp_config_t danp_config;
 
@@ -121,93 +118,6 @@ void danp_init(const danp_config_t *config)
 
 }
 
-/**
- * @brief Register a network interface.
- * @param iface Pointer to the interface to register.
- */
-void danp_register_interface(void *iface)
-{
-    danp_interface_t *iface_common = iface;
-    if (!iface_common)
-    {
-        danp_log_message(DANP_LOG_ERROR, "Cannot register NULL interface");
-        return;
-    }
-    if (!iface_common->tx_func)
-    {
-        danp_log_message(DANP_LOG_ERROR, "Interface tx_func is NULL, cannot register");
-        return;
-    }
-    if (!iface_common->name)
-    {
-        danp_log_message(DANP_LOG_ERROR, "Interface name is NULL, cannot register");
-        return;
-    }
-    if (iface_common->mtu == 0)
-    {
-        danp_log_message(DANP_LOG_ERROR, "Interface MTU is zero, cannot register");
-        return;
-    }
-    if (!iface_list)
-    {
-        danp_log_message(DANP_LOG_INFO, "Registering first network interface: %s", iface_common->name);
-    }
-    else
-    {
-        danp_log_message(DANP_LOG_INFO, "Registering network interface: %s", iface_common->name);
-    }
-    iface_common->next = iface_list;
-    iface_list = iface;
-    danp_log_message(DANP_LOG_VERBOSE, "Registered network interface");
-}
-
-/**
- * @brief Lookup the route for a destination node.
- * @param dest_node_id Destination node ID.
- * @return Pointer to the interface to use, or NULL if no route found.
- */
-static danp_interface_t *danp_route_lookup(uint16_t dest_node_id)
-{
-    (void)dest_node_id; // Mark parameter as unused
-    return iface_list;
-}
-
-/**
- * @brief Route a packet for transmission.
- * @param pkt Pointer to the packet to route.
- * @return 0 on success, negative on error.
- */
-int32_t danp_route_tx(danp_packet_t *pkt)
-{
-    uint16_t dst, src;
-    uint8_t dst_port, src_port, flags;
-    danp_unpack_header(pkt->header_raw, &dst, &src, &dst_port, &src_port, &flags);
-
-    danp_interface_t *out = danp_route_lookup(dst);
-    if (!out)
-    {
-        danp_log_message(DANP_LOG_ERROR, "No route to destination");
-        return -1;
-    }
-    danp_log_message(
-        DANP_LOG_DEBUG,
-        "TX [dst]=%u, [src]=%u, [dPort]=%u, [sPort]=%u, [flags]=0x%02X, [len]=%u, [iface]=%s",
-        dst,
-        src,
-        dst_port,
-        src_port,
-        flags,
-        pkt->length,
-        out->name);
-    return out->tx_func(out, pkt);
-}
-
-/**
- * @brief Process incoming data from an interface.
- * @param iface Pointer to the interface receiving data.
- * @param raw_data Pointer to the received data.
- * @param len Length of the received data.
- */
 void danp_input(danp_interface_t *iface, uint8_t *raw_data, uint16_t len)
 {
     if (len < DANP_HEADER_SIZE)

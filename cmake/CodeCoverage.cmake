@@ -124,7 +124,7 @@ function(setup_target_for_coverage_lcov)
         COMMAND ${LCOV_PATH} --add-tracefile ${Coverage_NAME}.base --add-tracefile ${Coverage_NAME}.info --output-file ${Coverage_NAME}.total
 
         # Filter out unwanted files
-        COMMAND ${LCOV_PATH} --remove ${Coverage_NAME}.total ${COVERAGE_EXCLUDES} --output-file ${Coverage_NAME}.info.cleaned
+        COMMAND ${LCOV_PATH} --ignore-errors unused --remove ${Coverage_NAME}.total ${COVERAGE_EXCLUDES} --output-file ${Coverage_NAME}.info.cleaned
 
         # Generate HTML report if genhtml is available
         COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:${GENHTML_PATH}>,echo,true> "Generating HTML coverage report..."

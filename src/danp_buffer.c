@@ -54,8 +54,10 @@ int32_t danp_buffer_init(void)
         buffer_mutex = osalMutexCreate(&sem_attr);
         if (!buffer_mutex)
         {
+            /* LCOV_EXCL_START */
             danp_log_message(DANP_LOG_ERROR, "Failed to create packet pool mutex");
             status = -ENOMEM;
+            /* LCOV_EXCL_STOP */
         }
 
         danp_log_message(DANP_LOG_INFO, "DANP packet pool initialized");
@@ -79,7 +81,9 @@ danp_packet_t *danp_buffer_allocate(void)
     {
         if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
+            /* LCOV_EXCL_START */
             break;
+            /* LCOV_EXCL_STOP */
         }
         is_mutex_taken = true;
 
@@ -130,7 +134,9 @@ void danp_buffer_free(danp_packet_t *pkt)
 
         if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
+            /* LCOV_EXCL_START */
             break;
+            /* LCOV_EXCL_STOP */
         }
         is_mutex_taken = true;
 
@@ -173,7 +179,9 @@ size_t danp_buffer_get_free_count(void)
     {
         if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
+            /* LCOV_EXCL_START */
             break;
+            /* LCOV_EXCL_STOP */
         }
         is_mutex_taken = true;
 

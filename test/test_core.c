@@ -9,8 +9,45 @@
  */
 
 #include "danp/danp.h"
+#include "danp/danp_buffer.h"
 #include "unity.h"
+#include <stdarg.h>
 #include <string.h>
+
+static int32_t core_loopback_tx(void *iface_common, danp_packet_t *packet)
+{
+    (void)iface_common;
+    (void)packet;
+    return 0;
+}
+
+static danp_interface_t core_loopback_iface = {
+    .name = "CORE_LOOPBACK",
+    .mtu = 128,
+    .tx_func = core_loopback_tx,
+};
+static bool core_iface_registered = false;
+
+static void ensure_core_interface(uint16_t address)
+{
+    core_loopback_iface.address = address;
+    if (!core_iface_registered)
+    {
+        danp_register_interface(&core_loopback_iface);
+        core_iface_registered = true;
+    }
+}
+
+static int core_stats_print_calls = 0;
+
+static void counting_print(const char *fmt, ...)
+{
+    (void)fmt;
+    va_list args;
+    va_start(args, fmt);
+    va_end(args);
+    core_stats_print_calls++;
+}
 
 /* ============================================================================
  * External Function Declarations
@@ -236,6 +273,106 @@ void test_init_sets_local_node(void)
     danp_close(socket);
 }
 
+void test_danp_input_drops_short_packets(void)
+{
+    ensure_core_interface(1);
+    TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE, danp_buffer_get_free_count());
+
+    uint8_t frame[2] = {0x00, 0x00};
+    danp_input(&core_loopback_iface, frame, sizeof(frame));
+
+    TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE, danp_buffer_get_free_count());
+}
+
+void test_danp_input_handles_no_memory(void)
+{
+    ensure_core_interface(1);
+    danp_packet_t *held[DANP_POOL_SIZE];
+
+    for (uint32_t i = 0; i < DANP_POOL_SIZE; i++)
+    {
+        held[i] = danp_buffer_allocate();
+        TEST_ASSERT_NOT_NULL(held[i]);
+    }
+
+    uint8_t frame[4];
+    uint32_t header = danp_pack_header(DANP_PRIORITY_NORMAL, 1, 1, 1, 1, DANP_FLAG_NONE);
+    memcpy(frame, &header, sizeof(header));
+    danp_input(&core_loopback_iface, frame, sizeof(frame));
+
+    TEST_ASSERT_NULL(danp_buffer_allocate());
+
+    for (uint32_t i = 0; i < DANP_POOL_SIZE; i++)
+    {
+        danp_buffer_free(held[i]);
+    }
+}
+
+void test_danp_input_drops_packets_for_other_nodes(void)
+{
+    ensure_core_interface(1);
+    uint8_t frame[6] = {0};
+    uint32_t header = danp_pack_header(DANP_PRIORITY_NORMAL, 2, 1, 1, 1, DANP_FLAG_NONE);
+    memcpy(frame, &header, sizeof(header));
+    frame[4] = 0xAA;
+    frame[5] = 0xBB;
+
+    danp_input(&core_loopback_iface, frame, sizeof(frame));
+
+    TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE, danp_buffer_get_free_count());
+}
+
+void test_buffer_free_handles_invalid_and_double_free(void)
+{
+    danp_packet_t *pkt = danp_buffer_allocate();
+    TEST_ASSERT_NOT_NULL(pkt);
+    danp_buffer_free(pkt);
+    danp_buffer_free(pkt);
+
+    danp_packet_t bogus;
+    danp_buffer_free(&bogus);
+}
+
+void test_buffer_get_free_count_tracks_allocations(void)
+{
+    danp_packet_t *first = danp_buffer_allocate();
+    danp_packet_t *second = danp_buffer_allocate();
+    TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE - 2, danp_buffer_get_free_count());
+
+    danp_buffer_free(second);
+    danp_buffer_free(first);
+    TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE, danp_buffer_get_free_count());
+}
+
+void test_bind_rejects_invalid_port(void)
+{
+    danp_socket_t *sock = danp_socket(DANP_TYPE_STREAM);
+    TEST_ASSERT_NOT_NULL(sock);
+    TEST_ASSERT_EQUAL_INT32(-1, danp_bind(sock, DANP_MAX_PORTS));
+    danp_close(sock);
+}
+
+void test_bind_detects_port_in_use(void)
+{
+    danp_socket_t *first = danp_socket(DANP_TYPE_DGRAM);
+    danp_socket_t *second = danp_socket(DANP_TYPE_DGRAM);
+    TEST_ASSERT_NOT_NULL(first);
+    TEST_ASSERT_NOT_NULL(second);
+
+    TEST_ASSERT_EQUAL_INT32(0, danp_bind(first, 5));
+    TEST_ASSERT_EQUAL_INT32(-1, danp_bind(second, 5));
+
+    danp_close(first);
+    danp_close(second);
+}
+
+void test_danp_print_stats_invokes_callback(void)
+{
+    core_stats_print_calls = 0;
+    danp_print_stats(counting_print);
+    TEST_ASSERT_GREATER_THAN_INT(0, core_stats_print_calls);
+}
+
 /* ============================================================================
  * Test Runner
  * ============================================================================
@@ -260,6 +397,14 @@ int main(void)
 
     /* Initialization tests */
     RUN_TEST(test_init_sets_local_node);
+    RUN_TEST(test_danp_input_drops_short_packets);
+    RUN_TEST(test_danp_input_handles_no_memory);
+    RUN_TEST(test_danp_input_drops_packets_for_other_nodes);
+    RUN_TEST(test_buffer_free_handles_invalid_and_double_free);
+    RUN_TEST(test_buffer_get_free_count_tracks_allocations);
+    RUN_TEST(test_bind_rejects_invalid_port);
+    RUN_TEST(test_bind_detects_port_in_use);
+    RUN_TEST(test_danp_print_stats_invokes_callback);
 
     return UNITY_END();
 }

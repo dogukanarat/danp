@@ -21,6 +21,26 @@ extern void danpLogMessageCallback(
     const char *message,
     va_list args);
 
+static void configure_route(uint16_t destination, const char *iface_name)
+{
+    char table_entry[32];
+    int written = snprintf(table_entry, sizeof(table_entry), "%u:%s", destination, iface_name);
+    if (written <= 0 || written >= (int)sizeof(table_entry))
+    {
+        printf("[Client] Failed to format route entry for destination %u\n", destination);
+        return;
+    }
+
+    if (danp_route_table_load(table_entry) != 0)
+    {
+        printf("[Client] Failed to install route '%s'\n", table_entry);
+    }
+    else
+    {
+        printf("[Client] Installed static route: %s\n", table_entry);
+    }
+}
+
 void taskClient(void *arg)
 {
     osalDelayMs(1000); // Wait for server to boot
@@ -71,6 +91,7 @@ int main()
     danp_zmq_interface_t zmq_iface = {0};
     danp_zmq_init(&zmq_iface, "tcp://*:5556", subEndpoints, 1, NODE_CLIENT);
     danp_register_interface((danp_interface_t *)&zmq_iface);
+    configure_route(NODE_SERVER, zmq_iface.common.name);
     danp_config_t config = {
         .local_node = NODE_CLIENT,
         .log_function = danpLogMessageCallback,
