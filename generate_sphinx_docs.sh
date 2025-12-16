@@ -38,7 +38,7 @@ echo ""
 
 # Step 2: Build Sphinx documentation
 echo "Step 2: Building Sphinx HTML documentation..."
-sphinx-build -b html . sphinx
+sphinx-build -b html docs sphinx
 
 if [ $? -ne 0 ]; then
     echo "Error: Sphinx build failed."

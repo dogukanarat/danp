@@ -20,13 +20,13 @@ pip install sphinx sphinx-rtd-theme breathe
 
 ```
 danp/
-├── conf.py                    # Sphinx configuration
-├── index.rst                  # Main documentation page
-├── api.rst                    # API reference page
+├── docs/
+│   ├── api.rst                # API reference page
+│   ├── conf.py                # Sphinx configuration
+│   ├── index.rst              # Main documentation page
+│   └── xml/                   # Doxygen XML output (generated)
 ├── Doxyfile                   # Doxygen configuration (XML output)
 ├── generate_sphinx_docs.sh    # Documentation generation script
-├── docs/
-│   └── xml/                   # Doxygen XML output (generated)
 └── sphinx/                    # Sphinx HTML output (generated)
     └── index.html             # Main documentation page
 ```
@@ -40,16 +40,16 @@ danp/
   - `GENERATE_XML = YES` (XML for Breathe/Sphinx)
   - `XML_OUTPUT = xml`
 
-### 2. conf.py
+### 2. docs/conf.py
 - **Purpose**: Sphinx configuration
 - **Extensions**: `breathe`, `sphinx_rtd_theme`
 - **Breathe Project**: Points to `docs/xml` for Doxygen XML
 
-### 3. index.rst
+### 3. docs/index.rst
 - **Purpose**: Main landing page
 - **Content**: Welcome message and table of contents
 
-### 4. api.rst
+### 4. docs/api.rst
 - **Purpose**: API reference documentation
 - **Directives Used**:
   - `.. doxygenfile::` - Document entire header files
@@ -69,7 +69,7 @@ doxygen Doxyfile
 
 **Step 2**: Build Sphinx HTML
 ```bash
-sphinx-build -b html . sphinx
+sphinx-build -b html docs sphinx
 ```
 
 ## Usage
@@ -104,8 +104,8 @@ The generated documentation includes:
 
 ### Adding New Pages
 
-1. Create a new `.rst` file (e.g., `tutorial.rst`)
-2. Add it to `index.rst` toctree:
+1. Create a new `.rst` file under `docs/` (e.g., `docs/tutorial.rst`)
+2. Add it to `docs/index.rst` toctree:
    ```rst
    .. toctree::
       :maxdepth: 2
@@ -116,7 +116,7 @@ The generated documentation includes:
 
 ### Changing Theme
 
-Edit `conf.py`:
+Edit `docs/conf.py`:
 ```python
 html_theme = 'alabaster'  # or 'classic', 'pyramid', etc.
 ```
@@ -141,7 +141,7 @@ Edit `api.rst` and add Breathe directives:
 - **Solution**: Run `doxygen Doxyfile` first
 
 ### Breathe Project Not Found
-- **Cause**: Wrong path in `conf.py`
+- **Cause**: Wrong path in `docs/conf.py`
 - **Solution**: Verify `breathe_projects` path matches XML output
 
 ### Duplicate Warnings

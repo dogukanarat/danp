@@ -480,10 +480,13 @@ danp/
 │       └── danpZmq.c
 ├── example/               # Example applications
 ├── test/                  # Unit tests
-├── docs/                  # Generated documentation
+├── docs/                 # Documentation sources and XML output
+│   ├── api.rst           # API reference page
+│   ├── conf.py           # Sphinx config
+│   ├── index.rst         # Documentation entry point
+│   └── xml/              # Generated Doxygen XML
 ├── CMakeLists.txt        # Build configuration
 ├── Doxyfile              # Doxygen config
-├── conf.py               # Sphinx config
 └── README.md             # This file
 ```
 

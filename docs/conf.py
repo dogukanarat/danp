@@ -1,5 +1,7 @@
 # Configuration file for the Sphinx documentation builder.
 
+import os
+
 # -- Project information -----------------------------------------------------
 project = 'DANP'
 copyright = '2025, DANP Team'
@@ -13,11 +15,11 @@ extensions = [
 ]
 
 templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'build', 'docs', 'cmake', 'example', 'test', 'src', 'include']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'xml']
 
 # -- Breathe configuration ---------------------------------------------------
 breathe_projects = {
-    "DANP": "docs/xml"
+    "DANP": os.path.join(os.path.dirname(__file__), "xml")
 }
 breathe_default_project = "DANP"
 
