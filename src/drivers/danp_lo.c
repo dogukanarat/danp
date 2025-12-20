@@ -16,8 +16,8 @@
 
 /* Definitions */
 
-#define DANP_LO_STACK_SIZE               (1024 * 4)
-#define DANP_LO_TIMEOUT_MS               (5000)
+#define DANP_DRIVER_LO_STACK_SIZE               (1024 * 4)
+#define DANP_DRIVER_LO_TIMEOUT_MS               (5000)
 
 /* Types */
 
@@ -36,7 +36,7 @@ danp_lo_context_t danp_lo_context;
 
 /* Functions */
 
-int32_t danp_lo_tx(void *iface_common, danp_packet_t *packet)
+static int32_t danp_lo_tx(void *iface_common, danp_packet_t *packet)
 {
     danp_lo_interface_t *lo_iface = (danp_lo_interface_t *)iface_common;
     danp_lo_context_t *ctx = (danp_lo_context_t *)lo_iface->context;
@@ -59,7 +59,7 @@ int32_t danp_lo_tx(void *iface_common, danp_packet_t *packet)
     return 0;
 }
 
-void *danp_lo_rx_routine(void *arg)
+static void danp_lo_rx_routine(void *arg)
 {
     danp_lo_interface_t *lo_iface = (danp_lo_interface_t *)arg;
     danp_lo_context_t *ctx = (danp_lo_context_t *)lo_iface->context;
@@ -67,7 +67,7 @@ void *danp_lo_rx_routine(void *arg)
     for (;;)
     {
         danp_packet_t pkt = {0};
-        if (0 == osalMessageQueueReceive(ctx->mq, &pkt, DANP_LO_TIMEOUT_MS))
+        if (0 == osalMessageQueueReceive(ctx->mq, &pkt, DANP_DRIVER_LO_TIMEOUT_MS))
         {
             danp_log_message(
                 DANP_LOG_VERBOSE,
@@ -89,7 +89,7 @@ int32_t danp_lo_init (danp_lo_interface_t *iface, uint16_t address)
     osalThreadAttr_t thread_attr =
     {
         .name = "danpLoCtx",
-        .stackSize = DANP_LO_STACK_SIZE,
+        .stackSize = DANP_DRIVER_LO_STACK_SIZE,
         .stackMem = NULL,
         .priority = OSAL_THREAD_PRIORITY_NORMAL,
         .cbMem = NULL,

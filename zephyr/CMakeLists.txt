@@ -6,7 +6,9 @@ if(CONFIG_DANP)
         ../src/danp.c
         ../src/danp_socket.c
         ../src/danp_buffer.c
-        ../src/driver/danp_lo.c
+        ../src/danp_route.c
+        ../src/drivers/danp_lo.c
+        ../src/drivers/danp_radio.c
         # Add any other source files from src/ here
     )
 

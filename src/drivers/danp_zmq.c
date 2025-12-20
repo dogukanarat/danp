@@ -33,7 +33,7 @@ static void *zmq_context = NULL;
 
 /* Functions */
 
-int32_t danp_zmq_tx(void *iface_common, danp_packet_t *packet)
+static int32_t danp_zmq_tx(void *iface_common, danp_packet_t *packet)
 {
     danp_zmq_interface_t *iface = (danp_zmq_interface_t *)iface_common;
     uint8_t buffer[DANP_MAX_PACKET_SIZE + 4];
@@ -63,7 +63,7 @@ int32_t danp_zmq_tx(void *iface_common, danp_packet_t *packet)
     return 0;
 }
 
-void *zmq_rx_routine(void *arg)
+static void danp_zmq_rx_routine(void *arg)
 {
     danp_zmq_interface_t *iface = (danp_zmq_interface_t *)arg;
     while (1)
@@ -94,7 +94,6 @@ void *zmq_rx_routine(void *arg)
             danp_log_message(DANP_LOG_WARN, "ZMQ RX: received packet too short");
         }
     }
-    return NULL;
 }
 
 void danp_zmq_init(
@@ -137,7 +136,7 @@ void danp_zmq_init(
     iface->common.mtu = DANP_MAX_PACKET_SIZE;
     iface->common.tx_func = danp_zmq_tx;
 
-    pthread_create((pthread_t*)&iface->rx_thread_id, NULL, zmq_rx_routine, iface);
+    pthread_create((pthread_t*)&iface->rx_thread_id, NULL, danp_zmq_rx_routine, iface);
 }
 
 /* LCOV_EXCL_STOP */
