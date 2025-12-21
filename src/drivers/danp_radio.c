@@ -99,6 +99,7 @@ static void danp_radio_rx_routine(void *arg)
 
 int32_t danp_radio_init (
     danp_radio_interface_t *iface,
+    const char *name,
     const struct device *radio_dev,
     const ralf_params_lora_t *rx_params,
     const ralf_params_lora_t *tx_params,
@@ -145,7 +146,7 @@ int32_t danp_radio_init (
 
         iface->common.address = address;
         iface->common.tx_func = danp_radio_tx;
-        iface->common.name = "Radio";
+        iface->common.name = name;
         iface->common.mtu = DANP_MAX_PACKET_SIZE;
         iface->context = radio_ctx;
 

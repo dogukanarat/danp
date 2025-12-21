@@ -33,6 +33,7 @@ typedef struct danp_radio_interface_s
 
 int32_t danp_radio_init (
     danp_radio_interface_t *iface,
+    const char *name,
     const struct device *radio_dev,
     const ralf_params_lora_t *rx_params,
     const ralf_params_lora_t *tx_params,
