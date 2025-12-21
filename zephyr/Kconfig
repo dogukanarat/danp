@@ -3,3 +3,11 @@ config DANP
     default y
     help
       Enable the DANP library.
+
+if DANP
+    config DANP_LOG_LEVEL
+        int "DANP log level"
+        default 4
+        help
+        Set the log level for the DANP (0-4).
+endif # DANP
