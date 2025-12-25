@@ -12,13 +12,14 @@ extern "C"
 
 /* Includes */
 
-#include "danp/danp_types.h"
-#include "osal/osal.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
+#include "osal/osal_message_queue.h"
+#include "osal/osal_semaphore.h"
 
 /**
  * @defgroup DANP_Config Configuration
@@ -59,6 +60,26 @@ extern "C"
 
 /** @brief Normal priority for packets. */
 #define DANP_PRIORITY_NORMAL 0
+
+/**
+ * @defgroup DANP_SFP Small Fragmentation Protocol
+ * @brief Configuration for SFP (Small Fragmentation Protocol).
+ * @{
+ */
+
+/** @brief Maximum user data per SFP fragment (MTU - Header - SFP header = 128 - 4 - 1 = 123). */
+#define DANP_SFP_MAX_DATA_PER_FRAGMENT (DANP_MAX_PACKET_SIZE - DANP_HEADER_SIZE - 1)
+
+/** @brief Maximum number of fragments per message. */
+#define DANP_SFP_MAX_FRAGMENTS 255
+
+/** @brief SFP flag: More fragments follow. */
+#define DANP_SFP_FLAG_MORE 0x80
+
+/** @brief SFP flag: First fragment. */
+#define DANP_SFP_FLAG_BEGIN 0x40
+
+/** @} */ // end of DANP_SFP
 
 /** @} */ // end of DANP_Config
 
@@ -110,10 +131,10 @@ typedef enum danp_socket_state_e
 } danp_socket_state_t;
 
 /** @brief Handle for an OS queue. */
-typedef osalMessageQueueHandle_t danp_os_queue_handle_t;
+typedef osal_message_queue_handle_t danp_os_queue_handle_t;
 
 /** @brief Handle for an OS semaphore. */
-typedef osalSemaphoreHandle_t danp_os_semaphore_handle_t;
+typedef osal_semaphore_handle_t danp_os_semaphore_handle_t;
 
 /* Header Packing Details (omitted for brevity) */
 
@@ -127,6 +148,7 @@ typedef struct danp_packet_s
 
     uint16_t length;                       /**< Length of the payload. */
     struct danp_interface_s *rx_interface;   /**< Interface where the packet was received. */
+    struct danp_packet_s *next;            /**< Pointer to next packet (for chaining/fragmentation). */
 } danp_packet_t;
 
 /**
@@ -290,6 +312,12 @@ danp_packet_t *danp_buffer_allocate(void);
 void danp_buffer_free(danp_packet_t *packet);
 
 /**
+ * @brief Get the number of free packets in the pool.
+ * @return Number of free packets available.
+ */
+size_t danp_buffer_get_free_count(void);
+
+/**
  * @brief Register a network interface.
  * @param iface Pointer to the interface to register.
  */
@@ -400,6 +428,82 @@ int32_t danp_recv_from(
     uint16_t *src_port,
     uint32_t timeout_ms);
 
+/**
+ * @defgroup DANP_ZeroCopy Zero-Copy API
+ * @brief Zero-copy buffer and fragmentation API (libcsp-style).
+ * @{
+ */
+
+/**
+ * @brief Allocate a packet buffer (alias for danp_buffer_allocate).
+ * @return Pointer to allocated packet, or NULL if pool is full.
+ */
+danp_packet_t *danp_buffer_get(void);
+
+/**
+ * @brief Send a packet directly without copying (zero-copy TX).
+ * @param sock Pointer to the socket.
+ * @param pkt Pointer to the packet to send (ownership transfers to stack).
+ * @return 0 on success, negative on error.
+ */
+int32_t danp_send_packet(danp_socket_t *sock, danp_packet_t *pkt);
+
+/**
+ * @brief Send a packet to specific destination without copying (zero-copy TX for DGRAM).
+ * @param sock Pointer to the socket.
+ * @param pkt Pointer to the packet to send (ownership transfers to stack).
+ * @param dst_node Destination node address.
+ * @param dst_port Destination port number.
+ * @return 0 on success, negative on error.
+ */
+int32_t danp_send_packet_to(danp_socket_t *sock, danp_packet_t *pkt, uint16_t dst_node, uint16_t dst_port);
+
+/**
+ * @brief Receive a packet directly without copying (zero-copy RX).
+ * @param sock Pointer to the socket.
+ * @param timeout_ms Timeout in milliseconds.
+ * @return Pointer to received packet (caller must free), or NULL on timeout/error.
+ */
+danp_packet_t *danp_recv_packet(danp_socket_t *sock, uint32_t timeout_ms);
+
+/**
+ * @brief Receive a packet from any source without copying (zero-copy RX for DGRAM).
+ * @param sock Pointer to the socket.
+ * @param src_node Pointer to store source node address (optional, can be NULL).
+ * @param src_port Pointer to store source port number (optional, can be NULL).
+ * @param timeout_ms Timeout in milliseconds.
+ * @return Pointer to received packet (caller must free), or NULL on timeout/error.
+ */
+danp_packet_t *danp_recv_packet_from(
+    danp_socket_t *sock,
+    uint16_t *src_node,
+    uint16_t *src_port,
+    uint32_t timeout_ms);
+
+/**
+ * @brief Send data with automatic fragmentation for large messages (SFP).
+ * @param sock Pointer to the socket.
+ * @param data Pointer to data to send.
+ * @param len Length of data (can exceed DANP_MAX_PACKET_SIZE).
+ * @return Total bytes sent on success, negative on error.
+ */
+int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len);
+
+/**
+ * @brief Receive and reassemble fragmented message (SFP).
+ * @param sock Pointer to the socket.
+ * @param timeout_ms Timeout in milliseconds.
+ * @return Pointer to first packet in chain (caller must free all), or NULL on timeout/error.
+ */
+danp_packet_t *danp_recv_sfp(danp_socket_t *sock, uint32_t timeout_ms);
+
+/**
+ * @brief Free a packet chain (frees all linked packets).
+ * @param pkt Pointer to first packet in chain.
+ */
+void danp_buffer_free_chain(danp_packet_t *pkt);
+
+/** @} */ // end of DANP_ZeroCopy
 
 void danp_print_stats(void (*print_func)(const char *fmt, ...));
 

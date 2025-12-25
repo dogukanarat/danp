@@ -33,7 +33,7 @@ static danp_route_entry_t route_table[DANP_MAX_NODES];
 static size_t route_count = 0U;
 
 /** @brief Mutex protecting routing state and interface list. */
-static osalMutexHandle_t route_mutex;
+static osal_mutex_handle_t route_mutex;
 
 /**
  * @brief Lazily create and lock the routing mutex.
@@ -43,14 +43,14 @@ static bool danp_route_lock(void)
 {
     if (route_mutex == NULL)
     {
-        osalMutexAttr_t attr = {
+        osal_mutex_attr_t attr = {
             .name = "danpRouteLock",
-            .attrBits = OSAL_MUTEX_PRIO_INHERIT,
-            .cbMem = NULL,
-            .cbSize = 0,
+            .attr_bits = OSAL_MUTEX_PRIO_INHERIT,
+            .cb_mem = NULL,
+            .cb_size = 0,
         };
 
-        route_mutex = osalMutexCreate(&attr);
+        route_mutex = osal_mutex_create(&attr);
         if (route_mutex == NULL)
         {
             /* LCOV_EXCL_START */
@@ -60,7 +60,7 @@ static bool danp_route_lock(void)
         }
     }
 
-    if (osalMutexLock(route_mutex, OSAL_WAIT_FOREVER) != OSAL_SUCCESS)
+    if (osal_mutex_lock(route_mutex, OSAL_WAIT_FOREVER) != OSAL_SUCCESS)
     {
         /* LCOV_EXCL_START */
         return false;
@@ -74,7 +74,7 @@ static void danp_route_unlock(bool is_locked)
 {
     if (is_locked)
     {
-        osalMutexUnlock(route_mutex);
+        osal_mutex_unlock(route_mutex);
     }
 }
 

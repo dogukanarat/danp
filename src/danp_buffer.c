@@ -24,7 +24,7 @@
 /* Variables */
 
 /** @brief Semaphore to protect the packet pool. */
-static osalMutexHandle_t buffer_mutex;
+static osal_mutex_handle_t buffer_mutex;
 
 /** @brief Pool of packets for allocation. */
 static danp_packet_t packet_pool[DANP_POOL_SIZE];
@@ -37,11 +37,11 @@ static bool packet_free_map[DANP_POOL_SIZE];
 int32_t danp_buffer_init(void)
 {
     int32_t status = 0;
-    osalMutexAttr_t sem_attr = {
+    osal_mutex_attr_t sem_attr = {
         .name = "DanpPoolLock",
-        .attrBits = OSAL_MUTEX_PRIO_INHERIT,
-        .cbMem = NULL,
-        .cbSize = 0,
+        .attr_bits = OSAL_MUTEX_PRIO_INHERIT,
+        .cb_mem = NULL,
+        .cb_size = 0,
     };
 
     for (;;)
@@ -51,7 +51,7 @@ int32_t danp_buffer_init(void)
             packet_free_map[i] = true;
         }
 
-        buffer_mutex = osalMutexCreate(&sem_attr);
+        buffer_mutex = osal_mutex_create(&sem_attr);
         if (!buffer_mutex)
         {
             /* LCOV_EXCL_START */
@@ -79,7 +79,7 @@ danp_packet_t *danp_buffer_allocate(void)
 
     for (;;)
     {
-        if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
+        if (0 != osal_mutex_lock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
             /* LCOV_EXCL_START */
             break;
@@ -109,7 +109,7 @@ danp_packet_t *danp_buffer_allocate(void)
 
     if (is_mutex_taken)
     {
-        osalMutexUnlock(buffer_mutex);
+        osal_mutex_unlock(buffer_mutex);
     }
 
     return pkt;
@@ -132,7 +132,7 @@ void danp_buffer_free(danp_packet_t *pkt)
             break;
         }
 
-        if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
+        if (0 != osal_mutex_lock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
             /* LCOV_EXCL_START */
             break;
@@ -162,7 +162,7 @@ void danp_buffer_free(danp_packet_t *pkt)
 
     if (is_mutex_taken)
     {
-        osalMutexUnlock(buffer_mutex);
+        osal_mutex_unlock(buffer_mutex);
     }
 }
 
@@ -177,7 +177,7 @@ size_t danp_buffer_get_free_count(void)
 
     for (;;)
     {
-        if (0 != osalMutexLock(buffer_mutex, OSAL_WAIT_FOREVER))
+        if (0 != osal_mutex_lock(buffer_mutex, OSAL_WAIT_FOREVER))
         {
             /* LCOV_EXCL_START */
             break;
@@ -198,8 +198,49 @@ size_t danp_buffer_get_free_count(void)
 
     if (is_mutex_taken)
     {
-        osalMutexUnlock(buffer_mutex);
+        osal_mutex_unlock(buffer_mutex);
     }
 
     return free_count;
+}
+
+/**
+ * @brief Allocate a packet buffer (libcsp-style alias).
+ * @return Pointer to allocated packet, or NULL if pool is full.
+ */
+danp_packet_t *danp_buffer_get(void)
+{
+    danp_packet_t *pkt = danp_buffer_allocate();
+    if (pkt)
+    {
+        pkt->next = NULL;
+    }
+    return pkt;
+}
+
+/**
+ * @brief Free a packet chain (frees all linked packets).
+ * @param pkt Pointer to first packet in chain.
+ */
+void danp_buffer_free_chain(danp_packet_t *pkt)
+{
+    danp_packet_t *current = pkt;
+    danp_packet_t *next_pkt;
+
+    for (;;)
+    {
+        if (!current)
+        {
+            break;
+        }
+
+        next_pkt = current->next;
+        danp_buffer_free(current);
+        current = next_pkt;
+
+        if (!next_pkt)
+        {
+            break;
+        }
+    }
 }

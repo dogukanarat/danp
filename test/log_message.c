@@ -55,7 +55,7 @@ void danp_log_message_with_func_name(
     const char *color_end = COLOR_RESET;
 
     /* Get system timestamp in milliseconds */
-    uint32_t system_time_ms = osalGetTickMs();
+    uint32_t system_time_ms = osal_get_tick_ms();
 
     /* Select color and label based on log level */
     switch (level)

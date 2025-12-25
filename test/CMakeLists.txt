@@ -3,13 +3,7 @@
 # ============================================================================
 
 # Unity via FetchContent
-include(FetchContent)
-FetchContent_Declare(
-    unity
-    GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
-    GIT_TAG v2.5.2
-)
-FetchContent_MakeAvailable(unity)
+find_package(unity REQUIRED)
 
 if(TARGET unity::unity)
     set(UNITY_TARGET unity::unity)
@@ -69,6 +63,7 @@ danp_add_test(test_core SOURCE test_core.c)
 danp_add_test(test_dgram SOURCE test_dgram.c)
 danp_add_test(test_stream SOURCE test_stream.c)
 danp_add_test(test_route SOURCE test_route.c)
+danp_add_test(test_zerocopy SOURCE test_zerocopy.c)
 
 # ============================================================================
 # Code Coverage Target
@@ -81,7 +76,7 @@ if(ENABLE_COVERAGE)
         NAME coverage
         EXECUTABLE ctest
         EXECUTABLE_ARGS --output-on-failure
-        DEPENDENCIES test_core test_dgram test_stream test_route
+        DEPENDENCIES test_core test_dgram test_stream test_route test_zerocopy
         EXCLUDE
             'test/*'
             'unity/*'
@@ -99,4 +94,5 @@ message(STATUS "Test suite configured:")
 message(STATUS "  - test_core: Core functionality tests")
 message(STATUS "  - test_dgram: DGRAM socket tests")
 message(STATUS "  - test_stream: STREAM socket tests")
+message(STATUS "  - test_zerocopy: Zero-copy and SFP tests")
 message(STATUS "Run 'ctest' or 'cmake --build . --target test' after building")
