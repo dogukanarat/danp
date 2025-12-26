@@ -7,6 +7,7 @@
 #include "osal/osal.h"
 #include "danp/danp.h"
 #include "../danp_debug.h"
+#include "osal/osal_thread.h"
 #include "danp/drivers/danp_zmq.h"
 #include <assert.h>
 #include <pthread.h>
@@ -103,6 +104,7 @@ void danp_zmq_init(
     int32_t sub_count,
     uint16_t node_id)
 {
+    
     if (zmq_context == NULL)
     {
         zmq_context = zmq_ctx_new();
@@ -136,7 +138,14 @@ void danp_zmq_init(
     iface->common.mtu = DANP_MAX_PACKET_SIZE;
     iface->common.tx_func = danp_zmq_tx;
 
-    pthread_create((pthread_t*)&iface->rx_thread_id, NULL, danp_zmq_rx_routine, iface);
+    osal_thread_attr_t thread_attr = {
+        .name = "DanpZmqRx",
+        .stack_size = 4096,
+        .priority = OSAL_THREAD_PRIORITY_NORMAL,
+    };
+
+    // Create the RX thread for ZMQ
+    osal_thread_create(danp_zmq_rx_routine, iface, &thread_attr);
 }
 
 /* LCOV_EXCL_STOP */

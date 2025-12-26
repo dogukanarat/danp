@@ -4,10 +4,14 @@
 
 /* Includes */
 
-#include "osal/osal.h"
+#include <stdio.h>
+
+#include "osal/osal_mutex.h"
+#include "osal/osal_time.h"
+
+#include "danp/danp_types.h"
 #include "danp/danp.h"
 #include "danp_debug.h"
-#include <stdio.h>
 
 /* Imports */
 
@@ -32,7 +36,7 @@ static danp_socket_t *socket_list;
 static uint16_t next_ephemeral_port = 1;
 
 /** @brief Mutex for socket operations. */
-static osalMutexHandle_t mutex_socket;
+static osal_mutex_handle_t mutex_socket;
 
 static danp_socket_t socket_pool[DANP_MAX_SOCKET_COUNT];
 
@@ -155,13 +159,13 @@ static void danp_send_control(danp_socket_t *sock, uint8_t flags, uint8_t seq_nu
  */
 int32_t danp_socket_init(void)
 {
-    osalMutexAttr_t attr = {
+    osal_mutex_attr_t attr = {
         .name = "danpSocketMutex",
-        .attrBits = OSAL_MUTEX_RECURSIVE,
-        .cbMem = NULL,
-        .cbSize = 0,
+        .attr_bits = OSAL_MUTEX_RECURSIVE,
+        .cb_mem = NULL,
+        .cb_size = 0,
     };
-    mutex_socket = osalMutexCreate(&attr);
+    mutex_socket = osal_mutex_create(&attr);
     if (!mutex_socket)
     {
         danp_log_message(DANP_LOG_ERROR, "Failed to create socket mutex");
@@ -187,19 +191,19 @@ int32_t danp_socket_init(void)
  */
 danp_socket_t *danp_socket(danp_socket_type_t type)
 {
-    osalStatus_t osal_status;
+    osal_status_t osal_status;
     bool is_mutex_taken = false;
     danp_socket_t *created_socket = NULL;
     danp_socket_t *slot = NULL;
-    osalMessageQueueHandle_t rx_q = NULL;
-    osalMessageQueueHandle_t acc_q = NULL;
-    osalSemaphoreHandle_t sig = NULL;
-    osalMessageQueueAttr_t mq_attr = { .name = "danpSockRx", .mqSize = 0 /*...*/ };
-    osalSemaphoreAttr_t sem_attr   = { .name = "danpSockSig", .maxCount = 1 /*...*/ };
+    osal_message_queue_handle_t rx_q = NULL;
+    osal_message_queue_handle_t acc_q = NULL;
+    osal_semaphore_handle_t sig = NULL;
+    osal_message_queue_attr_t mq_attr = { .name = "danpSockRx", .mq_size = 0 /*...*/ };
+    osal_semaphore_attr_t sem_attr   = { .name = "danpSockSig", .max_count = 1 /*...*/ };
 
     for (;;)
     {
-        osal_status = osalMutexLock(mutex_socket, OSAL_WAIT_FOREVER);
+        osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
         if (osal_status != OSAL_SUCCESS)
         {
             danp_log_message(DANP_LOG_ERROR, "Socket allocation failed: Mutex Lock Error");
@@ -254,15 +258,15 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
 
         if (slot->rx_queue == NULL)
         {
-            slot->rx_queue = osalMessageQueueCreate(10, sizeof(danp_packet_t *), &mq_attr);
+            slot->rx_queue = osal_message_queue_create(10, sizeof(danp_packet_t *), &mq_attr);
         }
         if (slot->accept_queue == NULL)
         {
-            slot->accept_queue = osalMessageQueueCreate(5, sizeof(danp_socket_t *), &mq_attr);
+            slot->accept_queue = osal_message_queue_create(5, sizeof(danp_socket_t *), &mq_attr);
         }
         if (slot->signal == NULL)
         {
-            slot->signal = osalSemaphoreCreate(&sem_attr);
+            slot->signal = osal_semaphore_create(&sem_attr);
         }
 
         if (slot->rx_queue == NULL || slot->accept_queue == NULL || slot->signal == NULL)
@@ -277,11 +281,11 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
         danp_packet_t *garbage_pkt;
         danp_socket_t *garbage_sock;
 
-        while (osalMessageQueueReceive(slot->rx_queue, &garbage_pkt, 0) == 0)
+        while (osal_message_queue_receive(slot->rx_queue, &garbage_pkt, 0) == 0)
         {
             danp_buffer_free(garbage_pkt);
         }
-        while (osalMessageQueueReceive(slot->accept_queue, &garbage_sock, 0) == 0)
+        while (osal_message_queue_receive(slot->accept_queue, &garbage_sock, 0) == 0)
         {
             // Just drain
         }
@@ -296,7 +300,7 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
 
     if (is_mutex_taken)
     {
-        osalMutexUnlock(mutex_socket);
+        osal_mutex_unlock(mutex_socket);
     }
 
     return created_socket;
@@ -311,12 +315,12 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
 int32_t danp_bind(danp_socket_t *sock, uint16_t port)
 {
     int32_t ret = 0;
-    osalStatus_t osal_status;
+    osal_status_t osal_status;
     bool is_mutex_taken = false;
 
     for (;;)
     {
-        osal_status = osalMutexLock(mutex_socket, OSAL_WAIT_FOREVER);
+        osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
         if (osal_status != OSAL_SUCCESS)
         {
             danp_log_message(DANP_LOG_ERROR, "Socket bind failed: Mutex Lock Error");
@@ -377,7 +381,7 @@ int32_t danp_bind(danp_socket_t *sock, uint16_t port)
 
     if (is_mutex_taken)
     {
-        osalMutexUnlock(mutex_socket);
+        osal_mutex_unlock(mutex_socket);
     }
 
     return ret;
@@ -403,10 +407,10 @@ int danp_listen(danp_socket_t *sock, int backlog)
  */
 int32_t danp_close(danp_socket_t *sock)
 {
-    osalStatus_t osal_status;
+    osal_status_t osal_status;
     bool is_mutex_taken = false;
 
-    osal_status = osalMutexLock(mutex_socket, OSAL_WAIT_FOREVER);
+    osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
     if (osal_status != OSAL_SUCCESS)
     {
         danp_log_message(DANP_LOG_ERROR, "Socket close failed: Mutex Lock Error");
@@ -451,7 +455,7 @@ int32_t danp_close(danp_socket_t *sock)
 
     if (is_mutex_taken)
     {
-        osalMutexUnlock(mutex_socket);
+        osal_mutex_unlock(mutex_socket);
     }
 
     return 0;
@@ -496,7 +500,7 @@ int32_t danp_connect(danp_socket_t *sock, uint16_t node, uint16_t port)
         sock->state = DANP_SOCK_SYN_SENT;
         danp_send_control(sock, DANP_FLAG_SYN, 0);
 
-        if (0 == osalSemaphoreTake(sock->signal, DANP_ACK_TIMEOUT_MS))
+        if (0 == osal_semaphore_take(sock->signal, DANP_ACK_TIMEOUT_MS))
         {
             danp_log_message(DANP_LOG_INFO, "Connection Established");
             break;
@@ -525,7 +529,7 @@ danp_socket_t *danp_accept(danp_socket_t *server_sock, uint32_t timeout_ms)
 
     for (;;)
     {
-        if (0 == osalMessageQueueReceive(server_sock->accept_queue, &client, timeout_ms))
+        if (0 == osal_message_queue_receive(server_sock->accept_queue, &client, timeout_ms))
         {
             break;
         }
@@ -586,7 +590,7 @@ int32_t danp_send(danp_socket_t *sock, void *data, uint16_t len)
             pkt = danp_buffer_allocate();
             if (!pkt)
             {
-                osalDelayMs(10);
+                osal_delay_ms(10);
                 continue;
             }
             pkt->header_raw = danp_pack_header(
@@ -602,7 +606,7 @@ int32_t danp_send(danp_socket_t *sock, void *data, uint16_t len)
             danp_route_tx(pkt);
             danp_buffer_free(pkt);
 
-            if (0 == osalSemaphoreTake(sock->signal, DANP_ACK_TIMEOUT_MS))
+            if (0 == osal_semaphore_take(sock->signal, DANP_ACK_TIMEOUT_MS))
             {
                 ack_received = true;
             }
@@ -641,7 +645,7 @@ int32_t danp_recv(danp_socket_t *sock, void *buffer, uint16_t max_len, uint32_t 
     danp_packet_t *pkt = NULL;
     int32_t copy_len = 0;
 
-    if (0 == osalMessageQueueReceive(sock->rx_queue, &pkt, timeout_ms))
+    if (0 == osal_message_queue_receive(sock->rx_queue, &pkt, timeout_ms))
     {
         if (pkt == NULL)
         {
@@ -685,11 +689,11 @@ void danp_socket_input_handler(danp_packet_t *pkt)
     danp_socket_t *child = NULL;
     danp_packet_t *garbage;
     bool is_mutex_taken = false;
-    osalStatus_t osal_status;
+    osal_status_t osal_status;
 
     for (;;)
     {
-        osal_status = osalMutexLock(mutex_socket, OSAL_WAIT_FOREVER);
+        osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
         if (osal_status != OSAL_SUCCESS)
         {
             danp_log_message(DANP_LOG_ERROR, "Socket Input Handler: Mutex Lock Error");
@@ -718,7 +722,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
 
                     // Wake up any waiters on recv
                     danp_packet_t *null_pkt = NULL;
-                    osalMessageQueueSend(sock->rx_queue, &null_pkt, 0);
+                    osal_message_queue_send(sock->rx_queue, &null_pkt, 0);
                 }
                 else
                 {
@@ -747,7 +751,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
                 sock->tx_seq = 0;
                 sock->rx_expected_seq = 0;
 
-                while (0 == osalMessageQueueReceive(sock->rx_queue, &garbage, 0))
+                while (0 == osal_message_queue_receive(sock->rx_queue, &garbage, 0))
                 {
                     danp_buffer_free(garbage); // Clear out old data
                 }
@@ -778,7 +782,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
 
             child->state = DANP_SOCK_SYN_RECEIVED; // Set state and wait for final ACK
 
-            if (0 != osalMessageQueueSend(sock->accept_queue, &child, 0))
+            if (0 != osal_message_queue_send(sock->accept_queue, &child, 0))
             {
                 child->state = DANP_SOCK_CLOSED;
                 child->local_port = 0;
@@ -795,7 +799,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
         {
             sock->state = DANP_SOCK_ESTABLISHED;
             danp_send_control(sock, DANP_FLAG_ACK, 0); // Send final ACK
-            osalSemaphoreGive(sock->signal);
+            osal_semaphore_give(sock->signal);
             danp_buffer_free(pkt);
             break;
         }
@@ -818,7 +822,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
                 acked_seq = pkt->payload[0];
                 if (acked_seq == sock->tx_seq)
                 {
-                    osalSemaphoreGive(sock->signal);
+                    osal_semaphore_give(sock->signal);
                 }
             }
             danp_buffer_free(pkt);
@@ -831,7 +835,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
         {
             if (sock->type == DANP_TYPE_DGRAM)
             {
-                osalMessageQueueSend(sock->rx_queue, &pkt, 0);
+                osal_message_queue_send(sock->rx_queue, &pkt, 0);
                 break;
             }
             else if (sock->type == DANP_TYPE_STREAM)
@@ -848,7 +852,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
                 {
                     sock->rx_expected_seq++;
                     danp_send_control(sock, DANP_FLAG_ACK, seq);
-                    osalMessageQueueSend(sock->rx_queue, &pkt, 0);
+                    osal_message_queue_send(sock->rx_queue, &pkt, 0);
                 }
                 else
                 {
@@ -867,7 +871,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
 
     if (is_mutex_taken)
     {
-        osalMutexUnlock(mutex_socket);
+        osal_mutex_unlock(mutex_socket);
     }
 }
 
@@ -952,7 +956,7 @@ int32_t danp_recv_from(
             break;
         }
 
-        if (0 == osalMessageQueueReceive(sock->rx_queue, &pkt, timeout_ms))
+        if (0 == osal_message_queue_receive(sock->rx_queue, &pkt, timeout_ms))
         {
             copy_len = (pkt->length > max_len) ? max_len : pkt->length;
             memcpy(buffer, pkt->payload, copy_len);

@@ -4,12 +4,9 @@
 
 /* Includes */
 
-#include "osal/osal.h"
 #include "danp/danp.h"
 #include "danp/danp_buffer.h"
 #include "danp_debug.h"
-#include <stdarg.h>
-#include <stdio.h>
 
 /* Imports */
 

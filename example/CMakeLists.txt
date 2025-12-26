@@ -44,6 +44,13 @@ danp_add_example(danp_stream_client SOURCE stream/client.c)
 danp_add_example(danp_stream_server SOURCE stream/server.c)
 
 # ============================================================================
+# Zero-Copy Examples
+# ============================================================================
+danp_add_example(danp_zerocopy_client SOURCE zerocopy/client.c)
+danp_add_example(danp_zerocopy_server SOURCE zerocopy/server.c)
+danp_add_example(danp_sfp_example SOURCE zerocopy/sfp_example.c)
+
+# ============================================================================
 # Example Summary
 # ============================================================================
 message(STATUS "Example applications configured:")
@@ -53,3 +60,7 @@ message(STATUS "    - danp_dgram_server")
 message(STATUS "  STREAM:")
 message(STATUS "    - danp_stream_client")
 message(STATUS "    - danp_stream_server")
+message(STATUS "  Zero-Copy:")
+message(STATUS "    - danp_zerocopy_client")
+message(STATUS "    - danp_zerocopy_server")
+message(STATUS "    - danp_sfp_example")

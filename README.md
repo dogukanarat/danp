@@ -64,6 +64,9 @@ DANP is a custom network protocol library designed for resource-constrained envi
 - **Multi-Interface Support**: Register multiple network interfaces
 - **Priority Support**: High/normal packet priorities
 - **Logging Framework**: Configurable logging with multiple levels
+- **Zero-Copy API**: libcsp-inspired zero-copy buffer management
+- **SFP (Small Fragmentation Protocol)**: Automatic fragmentation for large messages
+- **Packet Chaining**: Efficient handling of fragmented messages
 
 ## Design Criteria
 
@@ -371,6 +374,7 @@ danpClose(sock);
 For complete API documentation, see:
 - **Doxygen HTML**: `docs/html/index.html`
 - **Sphinx HTML**: `sphinx/index.html`
+- **Zero-Copy Guide**: [`ZEROCOPY.md`](ZEROCOPY.md)
 
 ## Examples
 
@@ -384,18 +388,31 @@ For complete API documentation, see:
   - `example/stream/client.c`
   - `example/stream/server.c`
 
+- **Zero-Copy Client/Server**: High-performance zero-copy communication
+  - `example/zerocopy/client.c`
+  - `example/zerocopy/server.c`
+  - `example/zerocopy/sfp_example.c` (fragmentation demo)
+
 ### Building Examples
 
 ```bash
 cmake -DBUILD_EXAMPLES=ON ..
 make
 
-# Run examples
+# Run traditional examples
 ./example/dgram/danp_dgram_server
 ./example/dgram/danp_dgram_client
 
 ./example/stream/danp_stream_server
 ./example/stream/danp_stream_client
+
+# Run zero-copy examples
+./example/zerocopy/danp_zerocopy_server
+./example/zerocopy/danp_zerocopy_client
+
+# Run SFP fragmentation demo
+./example/zerocopy/danp_sfp_example server  # Terminal 1
+./example/zerocopy/danp_sfp_example client  # Terminal 2
 ```
 
 ## Testing
@@ -421,11 +438,15 @@ Artifacts:
 
 The CI workflow publishes both files as artifacts for every run.
 
+### Test Suites
+
 - Core packet handling
 - DGRAM socket operations
 - STREAM socket operations
 - Connection management
 - Reliability mechanisms
+- Zero-copy buffer management
+- SFP fragmentation and reassembly
 
 ## Continuous Integration
 

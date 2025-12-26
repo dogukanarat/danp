@@ -47,16 +47,9 @@ endif()
 # Dependencies
 # ============================================================================
 find_package(Threads REQUIRED)
-
-include(FetchContent)
+find_package(Osal REQUIRED)
 
 set(OSAL_GIT_TAG "master" CACHE STRING "Git ref for the OSAL dependency")
-FetchContent_Declare(
-    osal
-    GIT_REPOSITORY https://github.com/dogukanarat/osal.git
-    GIT_TAG ${OSAL_GIT_TAG}
-)
-FetchContent_MakeAvailable(osal)
 
 if(TARGET osal::osal)
     set(OSAL_TARGET osal::osal)
@@ -86,11 +79,12 @@ target_sources(danp
         src/danp_route.c
         src/danp_socket.c
         src/danp_buffer.c
+        src/danp_zerocopy.c
 )
 
 # Driver sources
 if(DANP_ZMQ_SUPPORT)
-    target_sources(danp PRIVATE src/driver/danp_zmq.c)
+    target_sources(danp PRIVATE src/drivers/danp_zmq.c)
 endif()
 
 # ============================================================================
