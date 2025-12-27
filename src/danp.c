@@ -122,7 +122,7 @@ void danp_input(danp_interface_t *iface, uint8_t *raw_data, uint16_t len)
         danp_log_message(DANP_LOG_WARN, "Received packet too short, dropping");
         return;
     }
-    danp_packet_t *pkt = danp_buffer_allocate();
+    danp_packet_t *pkt = danp_buffer_get();
     if (!pkt)
     {
         danp_log_message(DANP_LOG_ERROR, "No memory for incoming packet, dropping");

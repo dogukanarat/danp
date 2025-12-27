@@ -1,14 +1,17 @@
 /* client.c - DGRAM Client Example */
 
-#include "../example_definitions.h"
-#include "danp/drivers/danp_zmq.h"
-#include "danp/danp.h"
-#include "osal/osal.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "osal/osal_thread.h"
+#include "osal/osal_time.h"
+#include "danp/danp.h"
+#include "danp/drivers/danp_zmq.h"
+
+#include "../example_definitions.h"
 
 extern void danpZmqInit(
     const char *pubBindEndpoint,
@@ -43,7 +46,7 @@ static void configure_route(uint16_t destination, const char *iface_name)
 
 void taskClient(void *arg)
 {
-    osalDelayMs(1000); // Wait for server to boot
+    osal_delay_ms(1000); // Wait for server to boot
     printf("[Client] Starting DGRAM Client...\n");
 
     // Create Socket (DGRAM)
@@ -78,7 +81,7 @@ void taskClient(void *arg)
             printf("[Client] DGRAM Receive Failed/Timeout (ret=%d)\n", reply_len);
         }
 
-        osalDelayMs(1000);
+        osal_delay_ms(1000);
     }
 
     danp_close(sock_dgram); // Close the DGRAM socket
@@ -97,16 +100,16 @@ int main()
         .log_function = danpLogMessageCallback,
     };
     danp_init(&config);
-    osalThreadAttr_t threadAttr = {
+    osal_thread_attr_t threadAttr = {
         .name = "Client",
-        .stackSize = 2048,
+        .stack_size = 2048,
         .priority = OSAL_THREAD_PRIORITY_NORMAL,
     };
-    osalThreadCreate(taskClient, NULL, &threadAttr);
+    osal_thread_create(taskClient, NULL, &threadAttr);
 
     while (1)
     {
-        osalDelayMs(1000);
+        osal_delay_ms(1000);
     }
 
     return 0;

@@ -1,14 +1,17 @@
 /* server.c - Zero-Copy Server Example */
 
-#include "../example_definitions.h"
-#include "danp/danp.h"
-#include "danp/drivers/danp_zmq.h"
-#include "osal/osal.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "danp/drivers/danp_zmq.h"
+#include "osal/osal_thread.h"
+#include "danp/danp.h"
+#include "danp/danp_buffer.h"
+
+#include "../example_definitions.h"
 
 #define ZEROCOPY_PORT 50
 
@@ -120,15 +123,15 @@ int main()
     };
     danp_init(&config);
 
-    osalThreadAttr_t threadAttr = {
+    osal_thread_attr_t threadAttr = {
         .name = "ServerTask",
         .priority = OSAL_THREAD_PRIORITY_NORMAL,
-        .stackSize = 4096,
+        .stack_size = 4096,
     };
-    osalThreadHandle_t server_thread = osalThreadCreate(taskServer, NULL, &threadAttr);
+    osal_thread_handle_t server_thread = osal_thread_create(taskServer, NULL, &threadAttr);
     assert(server_thread != NULL);
 
-    osalThreadJoin(server_thread, NULL);
+    osal_thread_join(server_thread);
 
     return 0;
 }

@@ -4,8 +4,10 @@
 
 /* Includes */
 
-#include "errno.h"
-#include "osal/osal.h"
+#include <errno.h>
+
+#include "osal/osal_mutex.h"
+
 #include "danp/danp.h"
 #include "danp_debug.h"
 
@@ -72,7 +74,7 @@ int32_t danp_buffer_init(void)
  * @brief Allocate a packet from the pool.
  * @return Pointer to the allocated packet, or NULL if pool is empty.
  */
-danp_packet_t *danp_buffer_allocate(void)
+danp_packet_t *danp_buffer_get(void)
 {
     danp_packet_t *pkt = NULL;
     bool is_mutex_taken = false;
@@ -166,10 +168,6 @@ void danp_buffer_free(danp_packet_t *pkt)
     }
 }
 
-/**
- * @brief Get the number of free packets in the pool.
- * @return Number of free packets.
- */
 size_t danp_buffer_get_free_count(void)
 {
     size_t free_count = 0;
@@ -202,20 +200,6 @@ size_t danp_buffer_get_free_count(void)
     }
 
     return free_count;
-}
-
-/**
- * @brief Allocate a packet buffer (libcsp-style alias).
- * @return Pointer to allocated packet, or NULL if pool is full.
- */
-danp_packet_t *danp_buffer_get(void)
-{
-    danp_packet_t *pkt = danp_buffer_allocate();
-    if (pkt)
-    {
-        pkt->next = NULL;
-    }
-    return pkt;
 }
 
 /**

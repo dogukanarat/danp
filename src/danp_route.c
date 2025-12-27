@@ -4,14 +4,16 @@
 
 /* Includes */
 
-#include "danp/danp.h"
-#include "danp_debug.h"
-#include "osal/osal.h"
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "osal/osal_mutex.h"
+
+#include "danp/danp.h"
+#include "danp_debug.h"
 
 /* Types */
 

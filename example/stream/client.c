@@ -1,14 +1,18 @@
 /* client.c - STREAM Client Example */
 
-#include "../example_definitions.h"
-#include "danp/drivers/danp_zmq.h"
-#include "osal/osal.h"
-#include "danp/danp.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "osal/osal_thread.h"
+#include "osal/osal_time.h"
+#include "danp/danp.h"
+#include "danp/drivers/danp_zmq.h"
+
+#include "../example_definitions.h"
+
 
 extern void danpZmqInit(
     const char *pubBindEndpoint,
@@ -44,7 +48,7 @@ static void configure_route(uint16_t destination, const char *iface_name)
 void taskClient(void *arg)
 {
     int32_t ret = 0;
-    osalDelayMs(1000); // Wait for server to boot
+    osal_delay_ms(1000); // Wait for server to boot
     printf("[Client] Starting Stream Client...\n");
 
     // 1. Create Socket (STREAM)
@@ -78,7 +82,7 @@ void taskClient(void *arg)
         reply[ret] = '\0';
         printf("[Client] Got Reply: %s\n", reply);
 
-        osalDelayMs(1000);
+        osal_delay_ms(1000);
     }
 
     danp_close(sock_stream); // Close the stream socket
@@ -97,19 +101,19 @@ int main()
         .log_function = danpLogMessageCallback,
     };
     danp_init(&config);
-    osalThreadAttr_t threadAttr = {
+    osal_thread_attr_t threadAttr = {
         .name = "ClientThread",
-        .stackSize = 2048,
-        .stackMem = NULL,
+        .stack_size = 2048,
+        .stack_mem = NULL,
         .priority = OSAL_THREAD_PRIORITY_NORMAL,
-        .cbMem = NULL,
-        .cbSize = 0,
+        .cb_mem = NULL,
+        .cb_size = 0,
     };
-    osalThreadCreate(taskClient, NULL, &threadAttr);
+    osal_thread_create(taskClient, NULL, &threadAttr);
 
     while (1)
     {
-        osalDelayMs(1000);
+        osal_delay_ms(1000);
     }
 
     return 0;

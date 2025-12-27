@@ -5,7 +5,7 @@
 /* Includes */
 
 #include "danp/danp.h"
-#include "osal/osal.h"
+#include "osal/osal_time.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -43,9 +43,13 @@ void danpLogMessageCallback(
     const char *levelStr = "UNKNOWN";
     const char *colorStart = "";
     const char *colorEnd = "\033[0m";
-    uint32_t sysTimeMs = osalGetTickMs();
+    uint32_t sysTimeMs = osal_get_tick_ms();
     switch (level)
     {
+    case DANP_LOG_VERBOSE:
+        levelStr = "Verbose";
+        colorStart = "\033[37m"; // White
+        break;
     case DANP_LOG_DEBUG:
         levelStr = "Debug";
         colorStart = "\033[36m"; // Cyan

@@ -7,10 +7,12 @@
  * names, and log levels to help with debugging during test execution.
  */
 
-#include "danp/danp.h"
-#include "osal/osal.h"
 #include <stdarg.h>
 #include <stdio.h>
+
+#include "osal/osal_time.h"
+
+#include "danp/danp_types.h"
 
 /* ============================================================================
  * ANSI Color Codes

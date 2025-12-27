@@ -8,11 +8,13 @@
  * - Initialization and configuration
  */
 
-#include "danp/danp.h"
-#include "danp/danp_buffer.h"
-#include "unity.h"
 #include <stdarg.h>
 #include <string.h>
+
+#include "unity.h"
+
+#include "danp/danp.h"
+#include "danp/danp_buffer.h"
 
 static int32_t core_loopback_tx(void *iface_common, danp_packet_t *packet)
 {
@@ -200,19 +202,19 @@ void test_memory_pool_allocates_until_exhaustion(void)
     /* Step 1: Allocate all packets from the pool */
     for (int i = 0; i < DANP_POOL_SIZE; i++)
     {
-        packets[i] = danp_buffer_allocate();
+        packets[i] = danp_buffer_get();
         TEST_ASSERT_NOT_NULL(packets[i]);
     }
 
     /* Step 2: Attempt to allocate beyond pool capacity - should fail */
-    danp_packet_t *fail_packet = danp_buffer_allocate();
+    danp_packet_t *fail_packet = danp_buffer_get();
     TEST_ASSERT_NULL(fail_packet);
 
     /* Step 3: Free one packet to make room in the pool */
     danp_buffer_free(packets[0]);
 
     /* Step 4: Allocation should now succeed again */
-    danp_packet_t *retry_packet = danp_buffer_allocate();
+    danp_packet_t *retry_packet = danp_buffer_get();
     TEST_ASSERT_NOT_NULL(retry_packet);
 
     /* Cleanup: Free all remaining packets */
@@ -232,8 +234,8 @@ void test_memory_pool_allocates_until_exhaustion(void)
 void test_packet_allocation_returns_different_packets(void)
 {
     /* Allocate two packets from the pool */
-    danp_packet_t *packet_1 = danp_buffer_allocate();
-    danp_packet_t *packet_2 = danp_buffer_allocate();
+    danp_packet_t *packet_1 = danp_buffer_get();
+    danp_packet_t *packet_2 = danp_buffer_get();
 
     /* Both allocations should succeed */
     TEST_ASSERT_NOT_NULL(packet_1);
@@ -291,7 +293,7 @@ void test_danp_input_handles_no_memory(void)
 
     for (uint32_t i = 0; i < DANP_POOL_SIZE; i++)
     {
-        held[i] = danp_buffer_allocate();
+        held[i] = danp_buffer_get();
         TEST_ASSERT_NOT_NULL(held[i]);
     }
 
@@ -300,7 +302,7 @@ void test_danp_input_handles_no_memory(void)
     memcpy(frame, &header, sizeof(header));
     danp_input(&core_loopback_iface, frame, sizeof(frame));
 
-    TEST_ASSERT_NULL(danp_buffer_allocate());
+    TEST_ASSERT_NULL(danp_buffer_get());
 
     for (uint32_t i = 0; i < DANP_POOL_SIZE; i++)
     {
@@ -324,7 +326,7 @@ void test_danp_input_drops_packets_for_other_nodes(void)
 
 void test_buffer_free_handles_invalid_and_double_free(void)
 {
-    danp_packet_t *pkt = danp_buffer_allocate();
+    danp_packet_t *pkt = danp_buffer_get();
     TEST_ASSERT_NOT_NULL(pkt);
     danp_buffer_free(pkt);
     danp_buffer_free(pkt);
@@ -335,8 +337,8 @@ void test_buffer_free_handles_invalid_and_double_free(void)
 
 void test_buffer_get_free_count_tracks_allocations(void)
 {
-    danp_packet_t *first = danp_buffer_allocate();
-    danp_packet_t *second = danp_buffer_allocate();
+    danp_packet_t *first = danp_buffer_get();
+    danp_packet_t *second = danp_buffer_get();
     TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE - 2, danp_buffer_get_free_count());
 
     danp_buffer_free(second);

@@ -4,15 +4,16 @@
 
 /* Includes */
 
-#include "osal/osal.h"
-#include "danp/danp.h"
-#include "../danp_debug.h"
-#include "osal/osal_thread.h"
-#include "danp/drivers/danp_zmq.h"
 #include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
+
 #include <zmq.h>
+#include "osal/osal_thread.h"
+
+#include "danp/danp.h"
+#include "../danp_debug.h"
+#include "danp/drivers/danp_zmq.h"
 
 /* LCOV_EXCL_START */ /* Requires live ZMQ endpoints; excluded from unit coverage */
 

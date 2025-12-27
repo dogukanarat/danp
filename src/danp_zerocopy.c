@@ -4,11 +4,16 @@
 
 /* Includes */
 
-#include "danp/danp.h"
-#include "danp_debug.h"
-#include "errno.h"
-#include "osal/osal.h"
+#include <errno.h>
 #include <string.h>
+
+#include "osal/osal_message_queue.h"
+
+#include "danp/danp.h"
+#include "danp/danp_buffer.h"
+#include "danp_debug.h"
+
+
 
 /* Imports */
 

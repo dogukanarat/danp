@@ -10,6 +10,7 @@
 #include "osal/osal_time.h"
 
 #include "danp/danp_types.h"
+#include "danp/danp_buffer.h"
 #include "danp/danp.h"
 #include "danp_debug.h"
 
@@ -118,7 +119,7 @@ static danp_socket_t *danp_find_socket(uint16_t local_port, uint16_t remote_node
  */
 static void danp_send_control(danp_socket_t *sock, uint8_t flags, uint8_t seq_num)
 {
-    danp_packet_t *pkt = danp_buffer_allocate();
+    danp_packet_t *pkt = danp_buffer_get();
 
     for (;;)
     {
@@ -564,7 +565,7 @@ int32_t danp_send(danp_socket_t *sock, void *data, uint16_t len)
 
         if (sock->type == DANP_TYPE_DGRAM)
         {
-            danp_packet_t *pkt = danp_buffer_allocate();
+            danp_packet_t *pkt = danp_buffer_get();
             if (!pkt)
             {
                 ret = -1;
@@ -587,7 +588,7 @@ int32_t danp_send(danp_socket_t *sock, void *data, uint16_t len)
 
         while (retries < DANP_RETRY_LIMIT && !ack_received)
         {
-            pkt = danp_buffer_allocate();
+            pkt = danp_buffer_get();
             if (!pkt)
             {
                 osal_delay_ms(10);
@@ -901,7 +902,7 @@ int32_t danp_send_to(danp_socket_t *sock, void *data, uint16_t len, uint16_t dst
             ret = -1;
             break;
         }
-        pkt = danp_buffer_allocate();
+        pkt = danp_buffer_get();
         if (!pkt)
         {
             ret = -1;

@@ -1,14 +1,19 @@
 /* client.c - Zero-Copy Client Example */
 
-#include "../example_definitions.h"
-#include "danp/danp.h"
-#include "danp/drivers/danp_zmq.h"
-#include "osal/osal.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "osal/osal_thread.h"
+#include "osal/osal_time.h"
+#include "danp/danp.h"
+#include "danp/danp_buffer.h"
+#include "danp/drivers/danp_zmq.h"
+
+#include "../example_definitions.h"
+
 
 #define ZEROCOPY_PORT 50
 
@@ -45,7 +50,7 @@ static void configure_route(uint16_t destination, const char *iface_name)
 
 void taskClient(void *arg)
 {
-    osalDelayMs(1000); // Wait for server to boot
+    osal_delay_ms(1000); // Wait for server to boot
     printf("[Client] Starting Zero-Copy Client...\n");
 
     // Create and connect socket
@@ -97,7 +102,7 @@ void taskClient(void *arg)
         // Free reply packet
         danp_buffer_free(reply);
 
-        osalDelayMs(500);
+        osal_delay_ms(500);
     }
 
     printf("[Client] Closing connection...\n");
@@ -118,15 +123,15 @@ int main()
     };
     danp_init(&config);
 
-    osalThreadAttr_t threadAttr = {
+    osal_thread_attr_t threadAttr = {
         .name = "ClientTask",
         .priority = OSAL_THREAD_PRIORITY_NORMAL,
-        .stackSize = 4096,
+        .stack_size = 4096,
     };
-    osalThreadHandle_t client_thread = osalThreadCreate(taskClient, NULL, &threadAttr);
+    osal_thread_handle_t client_thread = osal_thread_create(taskClient, NULL, &threadAttr);
     assert(client_thread != NULL);
 
-    osalThreadJoin(client_thread, NULL);
+    osal_thread_join(client_thread);
 
     return 0;
 }

@@ -10,10 +10,12 @@
  * - Bidirectional communication
  */
 
-#include "danp/danp.h"
-#include "unity.h"
 #include <stdio.h>
 #include <string.h>
+
+#include "unity.h"
+
+#include "danp/danp.h"
 
 /* ============================================================================
  * Test Configuration

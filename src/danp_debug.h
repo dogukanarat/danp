@@ -7,7 +7,6 @@
 
 /* Includes */
 
-#include "danp/danp.h"
 
 #ifdef __cplusplus
 extern "C"

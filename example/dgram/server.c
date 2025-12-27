@@ -1,14 +1,17 @@
 /* server.c - DGRAM Server Example */
 
-#include "../example_definitions.h"
-#include "danp/drivers/danp_zmq.h"
-#include "danp/danp.h"
-#include "osal/osal.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "osal/osal_thread.h"
+#include "osal/osal_time.h"
+#include "danp/danp.h"
+#include "danp/drivers/danp_zmq.h"
+
+#include "../example_definitions.h"
 
 extern void danpZmqInit(
     const char *pubBindEndpoint,
@@ -76,7 +79,7 @@ void taskEchoServer(void *arg)
         else
         {
             // Sleep briefly to yield CPU time
-            osalDelayMs(1);
+            osal_delay_ms(1);
         }
     }
 }
@@ -93,16 +96,16 @@ int main(int argc, char **argv)
         .log_function = danpLogMessageCallback,
     };
     danp_init(&config);
-    osalThreadAttr_t threadAttr = {
+    osal_thread_attr_t threadAttr = {
         .name = "EchoServer",
-        .stackSize = 2048,
+        .stack_size = 2048,
         .priority = OSAL_THREAD_PRIORITY_NORMAL,
     };
-    osalThreadCreate(taskEchoServer, NULL, &threadAttr);
+    osal_thread_create(taskEchoServer, NULL, &threadAttr);
 
     while (1)
     {
-        osalDelayMs(1000);
+        osal_delay_ms(1000);
     }
 
     return 0;

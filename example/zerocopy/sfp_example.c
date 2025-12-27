@@ -1,14 +1,18 @@
 /* sfp_example.c - SFP (Small Fragmentation Protocol) Example */
 
-#include "../example_definitions.h"
-#include "danp/danp.h"
-#include "danp/drivers/danp_zmq.h"
-#include "osal/osal.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "osal/osal_thread.h"
+#include "osal/osal_time.h"
+#include "danp/danp.h"
+#include "danp/danp_buffer.h"
+#include "danp/drivers/danp_zmq.h"
+
+#include "../example_definitions.h"
 
 #define SFP_PORT 51
 
@@ -98,7 +102,7 @@ void taskServer(void *arg)
 
 void taskClient(void *arg)
 {
-    osalDelayMs(1000); // Wait for server
+    osal_delay_ms(1000); // Wait for server
     printf("[SFP-Client] Starting SFP Client...\n");
 
     danp_socket_t *sock = danp_socket(DANP_TYPE_STREAM);
@@ -141,7 +145,7 @@ void taskClient(void *arg)
         printf("[SFP-Client] Successfully sent %d bytes (auto-fragmented)\n", sent);
     }
 
-    osalDelayMs(2000);
+    osal_delay_ms(2000);
 
     printf("[SFP-Client] Closing connection...\n");
     danp_close(sock);
@@ -178,24 +182,24 @@ int main(int argc, char **argv)
     };
     danp_init(&config);
 
-    osalThreadAttr_t threadAttr = {
+    osal_thread_attr_t threadAttr = {
         .name = (node_id == NODE_SERVER) ? "SFP-Server" : "SFP-Client",
         .priority = OSAL_THREAD_PRIORITY_NORMAL,
-        .stackSize = 8192,
+        .stack_size = 8192,
     };
 
-    osalThreadHandle_t thread;
+    osal_thread_handle_t thread;
     if (node_id == NODE_SERVER)
     {
-        thread = osalThreadCreate(taskServer, NULL, &threadAttr);
+        thread = osal_thread_create(taskServer, NULL, &threadAttr);
     }
     else
     {
-        thread = osalThreadCreate(taskClient, NULL, &threadAttr);
+        thread = osal_thread_create(taskClient, NULL, &threadAttr);
     }
 
     assert(thread != NULL);
-    osalThreadJoin(thread, NULL);
+    osal_thread_join(thread);
 
     return 0;
 }

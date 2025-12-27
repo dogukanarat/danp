@@ -10,12 +10,16 @@
  * - Automatic fragmentation and reassembly
  */
 
-#include "danp/danp.h"
-#include "unity.h"
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "unity.h"
+
+#include "danp/danp.h"
+#include "danp/danp_buffer.h"
+
 
 #define TEST_NODE_ID 42
 #define SERVER_PORT 60
@@ -33,7 +37,7 @@ static int32_t loopback_tx(void *iface_common, danp_packet_t *packet)
     (void)iface_common;
 
     /* Allocate new packet and copy data (simulate driver behavior) */
-    loopback_last_packet = danp_buffer_allocate();
+    loopback_last_packet = danp_buffer_get();
     if (loopback_last_packet)
     {
         memcpy(loopback_last_packet, packet, sizeof(danp_packet_t));

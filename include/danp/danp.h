@@ -5,11 +5,6 @@
 #ifndef INC_DANP_H
 #define INC_DANP_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 /* Includes */
 
 #include <stdarg.h>
@@ -18,184 +13,21 @@ extern "C"
 #include <stdint.h>
 #include <string.h>
 
-#include "osal/osal_message_queue.h"
-#include "osal/osal_semaphore.h"
+#include "danp/danp_types.h"
 
-/**
- * @defgroup DANP_Config Configuration
- * @brief Configuration constants for the DANP library.
- * @{
- */
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 /* Configurations */
 
+
 /* Definitions */
 
-/** @brief Maximum size of a DANP packet payload in bytes. */
-#define DANP_MAX_PACKET_SIZE 128
-
-/** @brief Size of the packet pool. */
-#define DANP_POOL_SIZE 20
-
-/** @brief Size of the DANP header in bytes. */
-#define DANP_HEADER_SIZE 4
-
-/** @brief Maximum number of retries for reliable transmission. */
-#define DANP_RETRY_LIMIT 3
-
-/** @brief Acknowledgment timeout in milliseconds. */
-#define DANP_ACK_TIMEOUT_MS 500
-
-/** @brief Maximum number of supported ports. */
-#define DANP_MAX_PORTS 64
-
-/** @brief Maximum number of supported nodes. */
-#define DANP_MAX_NODES 256
-
-/** @brief Constant for infinite wait. */
-#define DANP_WAIT_FOREVER 0xFFFFFFFFU
-
-/** @brief High priority for packets. */
-#define DANP_PRIORITY_HIGH 1
-
-/** @brief Normal priority for packets. */
-#define DANP_PRIORITY_NORMAL 0
-
-/**
- * @defgroup DANP_SFP Small Fragmentation Protocol
- * @brief Configuration for SFP (Small Fragmentation Protocol).
- * @{
- */
-
-/** @brief Maximum user data per SFP fragment (MTU - Header - SFP header = 128 - 4 - 1 = 123). */
-#define DANP_SFP_MAX_DATA_PER_FRAGMENT (DANP_MAX_PACKET_SIZE - DANP_HEADER_SIZE - 1)
-
-/** @brief Maximum number of fragments per message. */
-#define DANP_SFP_MAX_FRAGMENTS 255
-
-/** @brief SFP flag: More fragments follow. */
-#define DANP_SFP_FLAG_MORE 0x80
-
-/** @brief SFP flag: First fragment. */
-#define DANP_SFP_FLAG_BEGIN 0x40
-
-/** @} */ // end of DANP_SFP
-
-/** @} */ // end of DANP_Config
 
 /* Types */
 
-/**
- * @brief Packet flags for control and state.
- */
-typedef enum danp_packet_flags_e
-{
-    DANP_FLAG_NONE = 0x00, /**< No flags set. */
-    DANP_FLAG_SYN = 0x01,  /**< Connection Request. */
-    DANP_FLAG_ACK = 0x02,  /**< Acknowledge (used for both Connect and Data). */
-    DANP_FLAG_RST = 0x04   /**< Reset Connection. */
-} danp_packet_flags_t;
-
-/**
- * @brief Log levels for the library.
- */
-typedef enum danp_log_level_e
-{
-    DANP_LOG_VERBOSE = 0, /**< Verbose logging. */
-    DANP_LOG_DEBUG,       /**< Debug logging. */
-    DANP_LOG_INFO,        /**< Informational logging. */
-    DANP_LOG_WARN,        /**< Warning logging. */
-    DANP_LOG_ERROR        /**< Error logging. */
-} danp_log_level_t;
-
-/**
- * @brief Socket types.
- */
-typedef enum danp_socket_type_e
-{
-    DANP_TYPE_DGRAM = 0, /**< Unreliable (UDP-like). */
-    DANP_TYPE_STREAM = 1 /**< Reliable (RDP/TCP-like). */
-} danp_socket_type_t;
-
-/**
- * @brief Socket states.
- */
-typedef enum danp_socket_state_e
-{
-    DANP_SOCK_CLOSED,    /**< Socket is unused or closed. */
-    DANP_SOCK_OPEN,      /**< Socket is allocated and bound, but not connected (DGRAM default). */
-    DANP_SOCK_LISTENING, /**< Socket is waiting for incoming connections (STREAM). */
-    DANP_SOCK_SYN_SENT,  /**< Connection initiated, waiting for SYN-ACK (STREAM). */
-    DANP_SOCK_SYN_RECEIVED, /**< SYN received, waiting for final ACK (STREAM). */
-    DANP_SOCK_ESTABLISHED   /**< Connection established (STREAM) or Default Peer Set (DGRAM). */
-} danp_socket_state_t;
-
-/** @brief Handle for an OS queue. */
-typedef osal_message_queue_handle_t danp_os_queue_handle_t;
-
-/** @brief Handle for an OS semaphore. */
-typedef osal_semaphore_handle_t danp_os_semaphore_handle_t;
-
-/* Header Packing Details (omitted for brevity) */
-
-/**
- * @brief Structure representing a DANP packet.
- */
-typedef struct danp_packet_s
-{
-    uint32_t header_raw;                    /**< Raw header data. */
-    uint8_t payload[DANP_MAX_PACKET_SIZE]; /**< Payload data. */
-
-    uint16_t length;                       /**< Length of the payload. */
-    struct danp_interface_s *rx_interface;   /**< Interface where the packet was received. */
-    struct danp_packet_s *next;            /**< Pointer to next packet (for chaining/fragmentation). */
-} danp_packet_t;
-
-/**
- * @brief Structure representing a DANP socket.
- */
-typedef struct danp_socket_s
-{
-    danp_socket_state_t state; /**< Current state of the socket. */
-    danp_socket_type_t type;   /**< Type of the socket. */
-
-    // Addressing
-    uint16_t local_port;  /**< Local port number. */
-    uint16_t local_node;  /**< Local node address. */
-    uint16_t remote_node; /**< Remote node address. */
-    uint16_t remote_port; /**< Remote port number. */
-
-    // Reliability State (Stop-and-Wait)
-    uint8_t tx_seq;         /**< Transmit sequence number. */
-    uint8_t rx_expected_seq; /**< Expected receive sequence number. */
-
-    // RTOS Handles
-    danp_os_queue_handle_t rx_queue;     /**< Queue for received packets. */
-    danp_os_queue_handle_t accept_queue; /**< Queue for accepted connections. */
-    danp_os_semaphore_handle_t signal;  /**< Semaphore for signaling. */
-
-    struct danp_socket_s *next; /**< Pointer to the next socket in the list. */
-} danp_socket_t;
-
-/**
- * @brief Structure representing a network interface.
- */
-typedef struct danp_interface_s
-{
-    const char *name; /**< Name of the interface. */
-    uint16_t address; /**< Address of the interface. */
-    uint16_t mtu;     /**< Maximum Transmission Unit. */
-
-    /**
-     * @brief Function pointer to transmit a packet.
-     * @param iface Pointer to the interface.
-     * @param packet Pointer to the packet to transmit.
-     * @return 0 on success, negative on error.
-     */
-    int32_t (*tx_func)(void *iface_common, danp_packet_t *packet);
-
-    struct danp_interface_s *next; /**< Pointer to the next interface in the list. */
-} danp_interface_t;
 
 /**
  * @brief Callback function type for logging.
@@ -298,18 +130,6 @@ int32_t danp_route_table_load(const char *table);
  * @param length Length of the received data.
  */
 void danp_input(danp_interface_t *iface, uint8_t *data, uint16_t length);
-
-/**
- * @brief Allocate a packet from the pool.
- * @return Pointer to the allocated packet, or NULL if pool is empty.
- */
-danp_packet_t *danp_buffer_allocate(void);
-
-/**
- * @brief Free a packet back to the pool.
- * @param packet Pointer to the packet to free.
- */
-void danp_buffer_free(danp_packet_t *packet);
 
 /**
  * @brief Get the number of free packets in the pool.
@@ -429,18 +249,6 @@ int32_t danp_recv_from(
     uint32_t timeout_ms);
 
 /**
- * @defgroup DANP_ZeroCopy Zero-Copy API
- * @brief Zero-copy buffer and fragmentation API (libcsp-style).
- * @{
- */
-
-/**
- * @brief Allocate a packet buffer (alias for danp_buffer_allocate).
- * @return Pointer to allocated packet, or NULL if pool is full.
- */
-danp_packet_t *danp_buffer_get(void);
-
-/**
  * @brief Send a packet directly without copying (zero-copy TX).
  * @param sock Pointer to the socket.
  * @param pkt Pointer to the packet to send (ownership transfers to stack).
@@ -496,14 +304,6 @@ int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len);
  * @return Pointer to first packet in chain (caller must free all), or NULL on timeout/error.
  */
 danp_packet_t *danp_recv_sfp(danp_socket_t *sock, uint32_t timeout_ms);
-
-/**
- * @brief Free a packet chain (frees all linked packets).
- * @param pkt Pointer to first packet in chain.
- */
-void danp_buffer_free_chain(danp_packet_t *pkt);
-
-/** @} */ // end of DANP_ZeroCopy
 
 void danp_print_stats(void (*print_func)(const char *fmt, ...));
 
