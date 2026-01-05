@@ -52,6 +52,7 @@ void danp_log_message_with_func_name(
     const char *message,
     va_list args)
 {
+#ifdef BUILD_TESTS_WITH_LOGS
     const char *level_str = "UNKNOWN";
     const char *color_start = "";
     const char *color_end = COLOR_RESET;
@@ -102,4 +103,5 @@ void danp_log_message_with_func_name(
 
     /* Add newline */
     printf("\n");
+#endif /* BUILD_TESTS_WITH_LOGS */
 }

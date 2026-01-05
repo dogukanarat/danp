@@ -60,7 +60,7 @@ static bool loopback_registered = false;
  * ============================================================================
  */
 
-void setUp(void)
+static void setUp_zerocopy(void)
 {
     danp_config_t cfg = {.local_node = TEST_NODE_ID};
     danp_init(&cfg);
@@ -84,7 +84,7 @@ void setUp(void)
     loopback_last_packet = NULL;
 }
 
-void tearDown(void)
+static void tearDown_zerocopy(void)
 {
     if (loopback_last_packet)
     {
@@ -603,42 +603,97 @@ void test_packet_chain_iteration(void)
 }
 
 /* ============================================================================
- * Main Test Runner
+ * Test Suite Runner
  * ============================================================================
  */
 
-int main(void)
+void run_zerocopy_tests(void)
 {
-    UNITY_BEGIN();
-
     /* Buffer management tests */
+    setUp_zerocopy();
     RUN_TEST(test_buffer_get_initializes_next_to_null);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_buffer_get_allocates_from_pool);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_buffer_free_chain_frees_all_packets);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_buffer_free_chain_handles_null);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_buffer_free_chain_handles_single_packet);
+    tearDown_zerocopy();
 
     /* Zero-copy socket tests */
+    setUp_zerocopy();
     RUN_TEST(test_send_packet_zero_copy);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_recv_packet_zero_copy);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_recv_packet_timeout);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_send_packet_to);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_recv_packet_from);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_recv_packet_from_null_args);
+    tearDown_zerocopy();
 
     /* SFP tests */
+    setUp_zerocopy();
     RUN_TEST(test_sfp_send_small_message);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_send_large_message);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_send_null_socket);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_send_null_data);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_send_zero_length);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_recv_null_socket);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_recv_timeout);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_send_rejects_dgram);
+    tearDown_zerocopy();
+
+    setUp_zerocopy();
     RUN_TEST(test_sfp_recv_rejects_dgram);
+    tearDown_zerocopy();
 
     /* Packet chaining tests */
+    setUp_zerocopy();
     RUN_TEST(test_packet_chain_iteration);
-
-    return UNITY_END();
+    tearDown_zerocopy();
 }

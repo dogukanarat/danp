@@ -61,7 +61,10 @@ target_sources(Danp
     PRIVATE
         # Core implementation files
         ${CMAKE_CURRENT_SOURCE_DIR}/src/danp.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_int.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_buffer.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_route.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_socket.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_zerocopy.c
 )
 
 # ==============================================================================
@@ -145,6 +148,11 @@ set_target_properties(Danp
 # Note: Use PUBLIC for dependencies that appear in your public headers
 #       Use PRIVATE for dependencies only used in implementation files
 #       Use INTERFACE for header-only dependencies
+
+find_package(Osal REQUIRED)
+if(OSAL_FOUND)
+    target_link_libraries(Danp PUBLIC osal::osal)
+endif()
 
 # ==============================================================================
 # Optional Components

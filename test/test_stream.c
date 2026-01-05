@@ -27,11 +27,14 @@
 #define SERVER_PORT 10    /* Default server port */
 #define CLIENT_PORT 11    /* Default client port */
 
+#ifdef ENABLE_TEST_LOGGING
+/* External logging function declaration (only when logging is enabled) */
 void danp_log_message_with_func_name(
     danp_log_level_t level,
     const char *func_name,
     const char *message,
     va_list args);
+#endif
 
 static danp_interface_t loopback_iface;
 static bool loopback_registered = false;
@@ -91,10 +94,14 @@ static void setup_loopback_interface(void)
  * The loopback interface feeds packets back to the local node, enabling
  * synchronous handshake testing.
  */
-void setUp(void)
+static void setUp_stream(void)
 {
     /* Initialize DANP core with test node ID */
+#ifdef ENABLE_TEST_LOGGING
     danp_config_t config = {.local_node = TEST_NODE_ID, .log_function = danp_log_message_with_func_name};
+#else
+    danp_config_t config = {.local_node = TEST_NODE_ID, .log_function = NULL};
+#endif
     danp_init(&config);
 
     setup_loopback_interface();
@@ -103,7 +110,7 @@ void setUp(void)
 /**
  * @brief Teardown function called after each test
  */
-void tearDown(void)
+static void tearDown_stream(void)
 {
     /* No cleanup needed for current tests */
 }
@@ -320,30 +327,36 @@ void test_stream_accept_timeout_returns_null(void)
  */
 
 /**
- * @brief Main test runner
+ * @brief Run all STREAM socket tests
  *
- * Executes all STREAM socket tests in sequence
+ * This function is called by the main test runner to execute
+ * all STREAM socket tests in sequence
  */
-int main(void)
+void run_stream_tests(void)
 {
-    UNITY_BEGIN();
-
     /* Run all STREAM socket tests */
 #if ENABLE_TEST_STREAM_HANDSHAKE
+    setUp_stream();
     RUN_TEST(test_stream_handshake_and_data_transfer);
+    tearDown_stream();
 #endif
 #if ENABLE_TEST_STREAM_CLOSE_RST
+    setUp_stream();
     RUN_TEST(test_stream_close_triggers_rst);
+    tearDown_stream();
 #endif
 #if ENABLE_TEST_STREAM_SOCKET_STATES
+    setUp_stream();
     RUN_TEST(test_stream_socket_creation_and_states);
+    tearDown_stream();
 #endif
 #if ENABLE_TEST_STREAM_BIDIRECTIONAL
+    setUp_stream();
     RUN_TEST(test_stream_bidirectional_communication);
-#endif
-#if ENABLE_TEST_STREAM_BIDIRECTIONAL
-    RUN_TEST(test_stream_accept_timeout_returns_null);
-#endif
+    tearDown_stream();
 
-    return UNITY_END();
+    setUp_stream();
+    RUN_TEST(test_stream_accept_timeout_returns_null);
+    tearDown_stream();
+#endif
 }

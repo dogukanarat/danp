@@ -75,7 +75,7 @@ static void setup_loopback_interface(void)
  * The loopback interface simulates a network by feeding packets back
  * to the local node.
  */
-void setUp(void)
+static void setUp_dgram(void)
 {
     /* Initialize DANP core with test node ID */
     danp_config_t config = {.local_node = TEST_NODE_ID};
@@ -87,7 +87,7 @@ void setUp(void)
 /**
  * @brief Teardown function called after each test
  */
-void tearDown(void)
+static void tearDown_dgram(void)
 {
     /* No cleanup needed for current tests */
 }
@@ -257,25 +257,35 @@ void test_dgram_recv_timeout_returns_error(void)
 }
 
 /* ============================================================================
- * Test Runner
+ * Test Suite Runner
  * ============================================================================
  */
 
 /**
- * @brief Main test runner
+ * @brief Run all DGRAM socket tests
  *
- * Executes all DGRAM socket tests in sequence
+ * This function is called by the main test runner to execute
+ * all DGRAM socket tests in sequence
  */
-int main(void)
+void run_dgram_tests(void)
 {
-    UNITY_BEGIN();
-
-    /* Run all DGRAM socket tests */
+    setUp_dgram();
     RUN_TEST(test_dgram_send_recv_same_node);
-    RUN_TEST(test_dgram_multiple_messages);
-    RUN_TEST(test_dgram_socket_creation_and_binding);
-    RUN_TEST(test_dgram_send_to_rejects_large_payload);
-    RUN_TEST(test_dgram_recv_timeout_returns_error);
+    tearDown_dgram();
 
-    return UNITY_END();
+    setUp_dgram();
+    RUN_TEST(test_dgram_multiple_messages);
+    tearDown_dgram();
+
+    setUp_dgram();
+    RUN_TEST(test_dgram_socket_creation_and_binding);
+    tearDown_dgram();
+
+    setUp_dgram();
+    RUN_TEST(test_dgram_send_to_rejects_large_payload);
+    tearDown_dgram();
+
+    setUp_dgram();
+    RUN_TEST(test_dgram_recv_timeout_returns_error);
+    tearDown_dgram();
 }

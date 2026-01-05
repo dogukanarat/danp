@@ -4,13 +4,19 @@
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 # ==============================================================================
+# Test Options
+# ==============================================================================
+# Option to force using FetchContent even if Unity is installed locally
+option(FORCE_FETCH_UNITY "Force download Unity via FetchContent" OFF)
+
+# Option to enable logging during tests (useful for debugging)
+option(BUILD_TESTS_WITH_LOGS "Enable logging output during tests" OFF)
+
+# ==============================================================================
 # Unity Test Framework Dependency
 # ==============================================================================
 # Try to find Unity framework locally first (if installed on the system)
 # If not found, download it using FetchContent
-
-# Option to force using FetchContent even if Unity is installed locally
-option(FORCE_FETCH_UNITY "Force download Unity via FetchContent" OFF)
 
 # Variable to track if Unity was found
 set(UNITY_FOUND FALSE)
@@ -116,8 +122,26 @@ add_executable(TestDanp)
 # Add test source files
 target_sources(TestDanp
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_danp.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_runner.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_core.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_dgram.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_route.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_stream.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_zerocopy.c
 )
+
+# Conditionally add log_message.c if logging is enabled
+if(BUILD_TESTS_WITH_LOGS)
+    target_sources(TestDanp
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/log_message.c
+    )
+    # Define preprocessor macro to enable logging in tests
+    target_compile_definitions(TestDanp PRIVATE ENABLE_TEST_LOGGING=1)
+    message(STATUS "Test logging: ENABLED")
+else()
+    message(STATUS "Test logging: DISABLED (use -DBUILD_TESTS_WITH_LOGS=ON to enable)")
+endif()
 
 # ==============================================================================
 # Test Dependencies and Libraries

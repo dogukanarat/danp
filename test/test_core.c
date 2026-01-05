@@ -82,7 +82,7 @@ extern void danp_unpack_header(
  *
  * Initializes the DANP library with a default local node address of 1
  */
-void setUp(void)
+static void setUp_core(void)
 {
     danp_config_t cfg = {.local_node = 1};
     danp_init(&cfg);
@@ -91,7 +91,7 @@ void setUp(void)
 /**
  * @brief Teardown function called after each test
  */
-void tearDown(void)
+static void tearDown_core(void)
 {
     /* No cleanup needed for current tests */
 }
@@ -376,37 +376,70 @@ void test_danp_print_stats_invokes_callback(void)
 }
 
 /* ============================================================================
- * Test Runner
+ * Test Suite Runner
  * ============================================================================
  */
 
 /**
- * @brief Main test runner
+ * @brief Run all core functionality tests
  *
- * Executes all core functionality tests in sequence
+ * This function is called by the main test runner to execute
+ * all core functionality tests in sequence
  */
-int main(void)
+void run_core_tests(void)
 {
-    UNITY_BEGIN();
-
     /* Header packing tests */
+    setUp_core();
     RUN_TEST(test_header_packing_preserves_values);
+    tearDown_core();
+
+    setUp_core();
     RUN_TEST(test_header_packing_handles_edge_cases);
+    tearDown_core();
 
     /* Memory pool tests */
+    setUp_core();
     RUN_TEST(test_memory_pool_allocates_until_exhaustion);
+    tearDown_core();
+
+    setUp_core();
     RUN_TEST(test_packet_allocation_returns_different_packets);
+    tearDown_core();
 
     /* Initialization tests */
+    setUp_core();
     RUN_TEST(test_init_sets_local_node);
-    RUN_TEST(test_danp_input_drops_short_packets);
-    RUN_TEST(test_danp_input_handles_no_memory);
-    RUN_TEST(test_danp_input_drops_packets_for_other_nodes);
-    RUN_TEST(test_buffer_free_handles_invalid_and_double_free);
-    RUN_TEST(test_buffer_get_free_count_tracks_allocations);
-    RUN_TEST(test_bind_rejects_invalid_port);
-    RUN_TEST(test_bind_detects_port_in_use);
-    RUN_TEST(test_danp_print_stats_invokes_callback);
+    tearDown_core();
 
-    return UNITY_END();
+    setUp_core();
+    RUN_TEST(test_danp_input_drops_short_packets);
+    tearDown_core();
+
+    setUp_core();
+    RUN_TEST(test_danp_input_handles_no_memory);
+    tearDown_core();
+
+    setUp_core();
+    RUN_TEST(test_danp_input_drops_packets_for_other_nodes);
+    tearDown_core();
+
+    setUp_core();
+    RUN_TEST(test_buffer_free_handles_invalid_and_double_free);
+    tearDown_core();
+
+    setUp_core();
+    RUN_TEST(test_buffer_get_free_count_tracks_allocations);
+    tearDown_core();
+
+    setUp_core();
+    RUN_TEST(test_bind_rejects_invalid_port);
+    tearDown_core();
+
+    setUp_core();
+    RUN_TEST(test_bind_detects_port_in_use);
+    tearDown_core();
+
+    setUp_core();
+    RUN_TEST(test_danp_print_stats_invokes_callback);
+    tearDown_core();
 }

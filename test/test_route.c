@@ -75,7 +75,7 @@ static void prepare_packet(danp_packet_t *pkt, uint16_t dest_node, uint16_t payl
  * ============================================================================
  */
 
-void setUp(void)
+static void setUp_route(void)
 {
     danp_config_t cfg = {.local_node = 1};
     danp_init(&cfg);
@@ -89,7 +89,7 @@ void setUp(void)
     TEST_ASSERT_EQUAL_INT32(0, danp_route_table_load(""));
 }
 
-void tearDown(void)
+static void tearDown_route(void)
 {
     /* Nothing to clean up between tests */
 }
@@ -194,20 +194,33 @@ void test_route_tx_handles_missing_inputs(void)
 }
 
 /* ============================================================================
- * Test Runner
+ * Test Suite Runner
  * ============================================================================
  */
 
-int main(void)
+void run_route_tests(void)
 {
-    UNITY_BEGIN();
-
+    setUp_route();
     RUN_TEST(test_route_table_routes_packets_over_registered_interfaces);
-    RUN_TEST(test_route_table_replaces_entries_and_clears_on_error);
-    RUN_TEST(test_route_tx_enforces_mtu_limits);
-    RUN_TEST(test_route_register_interface_validates_inputs);
-    RUN_TEST(test_route_table_load_errors_and_whitespace);
-    RUN_TEST(test_route_tx_handles_missing_inputs);
+    tearDown_route();
 
-    return UNITY_END();
+    setUp_route();
+    RUN_TEST(test_route_table_replaces_entries_and_clears_on_error);
+    tearDown_route();
+
+    setUp_route();
+    RUN_TEST(test_route_tx_enforces_mtu_limits);
+    tearDown_route();
+
+    setUp_route();
+    RUN_TEST(test_route_register_interface_validates_inputs);
+    tearDown_route();
+
+    setUp_route();
+    RUN_TEST(test_route_table_load_errors_and_whitespace);
+    tearDown_route();
+
+    setUp_route();
+    RUN_TEST(test_route_tx_handles_missing_inputs);
+    tearDown_route();
 }
