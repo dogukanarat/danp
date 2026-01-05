@@ -1,4 +1,4 @@
-# scaffold_project
+# danp
 
 A minimal scaffold template for creating CMake-based C libraries with proper installation support.
 
@@ -24,19 +24,19 @@ This is a ready-to-use scaffold for creating C libraries with CMake. It provides
 ## Directory Structure
 
 ```
-scaffold_project/
-├── include/scaffold_project/            # Public headers
-│   ├── scaffold_project.h               # Main API header
-│   └── scaffold_project_types.h         # Common types and definitions
+danp/
+├── include/danp/            # Public headers
+│   ├── danp.h               # Main API header
+│   └── danp_types.h         # Common types and definitions
 ├── src/                            # Implementation
-│   ├── scaffold_project.c               # Core implementation
-│   └── scaffold_project_int.c           # Internal utilities
+│   ├── danp.c               # Core implementation
+│   └── danp_int.c           # Internal utilities
 ├── test/                           # Unit tests (Unity framework)
 │   ├── CMakeLists.txt              # Test build configuration
-│   ├── test_scaffold_project.c          # Example test file
+│   ├── test_danp.c          # Example test file
 │   └── README.md                   # Testing guide
 ├── cmake/                          # CMake modules
-│   └── scaffold_projectConfig.cmake.in  # Package config template
+│   └── danpConfig.cmake.in  # Package config template
 ├── ci/                             # CI/CD automation scripts
 │   ├── debug.sh                    # Debug build + tests
 │   ├── release.sh                  # Release build
@@ -138,7 +138,7 @@ The scaffold includes a `.clang-format` configuration file that enforces consist
 **Format Specific Files:**
 ```bash
 clang-format -i src/myfile.c
-clang-format -i include/scaffold_project/myheader.h
+clang-format -i include/danp/myheader.h
 ```
 
 **Example Formatted Code:**
@@ -232,17 +232,17 @@ ctest --verbose
 # Run only unit tests
 ctest -L unit
 
-# Run only scaffold_project tests
-ctest -L scaffold_project
+# Run only danp tests
+ctest -L danp
 ```
 
 ### Writing Tests
 
-See [test/README.md](file:///home/dogukanarat/workspace/scaffold_project/test/README.md) for a comprehensive guide on writing tests with Unity.
+See [test/README.md](file:///home/dogukanarat/workspace/danp/test/README.md) for a comprehensive guide on writing tests with Unity.
 
 **Quick Example:**
 ```c
-#include "scaffold_project/scaffold_project.h"
+#include "danp/danp.h"
 #include "unity.h"
 
 void test_myFunction_should_returnSuccess(void)
@@ -273,8 +273,8 @@ sudo make install
 
 This will install:
 - Library files to `/usr/local/lib/`
-- Header files to `/usr/local/include/scaffold_project/`
-- CMake config files to `/usr/local/lib/cmake/scaffold_project/`
+- Header files to `/usr/local/include/danp/`
+- CMake config files to `/usr/local/lib/cmake/danp/`
 
 ### Custom Installation Prefix
 
@@ -295,19 +295,19 @@ cmake_minimum_required(VERSION 3.14)
 project(MyProject)
 
 # Find the installed library
-find_package(scaffold_project REQUIRED)
+find_package(danp REQUIRED)
 
 # Create your executable
 add_executable(myapp main.c)
 
 # Link against the library
-target_link_libraries(myapp PRIVATE scaffold_project::scaffold_project)
+target_link_libraries(myapp PRIVATE danp::danp)
 ```
 
 ### In Your C Code
 
 ```c
-#include <scaffold_project/scaffold_project.h>
+#include <danp/danp.h>
 
 int main(void) {
     /* Use the library */
@@ -468,4 +468,4 @@ Update the license information in all source files and add a LICENSE file as nee
 
 ## Repository
 
-GitHub: [dogukanarat/scaffold_project](https://github.com/dogukanarat/scaffold_project)
+GitHub: [dogukanarat/danp](https://github.com/dogukanarat/danp)
