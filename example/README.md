@@ -1,316 +1,575 @@
-# Example Applications
+# DANP Example Applications
 
-This directory contains example applications that demonstrate how to use the scaffold_project library with proper POSIX-compliant CLI design.
+This directory contains example applications demonstrating how to use the DANP (Data and Network Protocol) library in real-world scenarios.
+
+## Overview
+
+DANP examples showcase common networking patterns using both DGRAM (unreliable, UDP-like) and STREAM (reliable, TCP-like) sockets. Each example demonstrates proper initialization, interface registration, routing, and communication.
 
 ## Building Examples
 
 To build the example applications, enable the `BUILD_EXAMPLES` option when configuring CMake:
 
 ```bash
-mkdir build && cd build
-cmake -DBUILD_EXAMPLES=ON ..
-make
+cmake -B build -DBUILD_EXAMPLES=ON
+cmake --build build
 ```
 
-## Running the CLI Example
+## Planned Examples
 
-After building, run the example from the build directory:
+### 1. Echo Server (DGRAM)
 
-```bash
-./ScaffoldProjectExample <command> [arguments]
-```
-
-### Available Commands
-
-```bash
-# Get library version
-./ScaffoldProjectExample version
-
-# Add two numbers
-./ScaffoldProjectExample add 5 3
-
-# Multiply two numbers (demonstrates error handling)
-./ScaffoldProjectExample multiply 7 6
-
-# Process a string
-./ScaffoldProjectExample foo "hello world"
-
-# Validate a number
-./ScaffoldProjectExample bar 42
-
-# Calculate factorial (must be 0-12)
-./ScaffoldProjectExample factorial 5
-```
-
-### Verbose Mode
-
-Use the `-v` flag to see detailed execution information:
-
-```bash
-./ScaffoldProjectExample -v add 10 20
-# Output to stderr: Calling scaffold_project_add(10, 20)...
-# Output to stdout: 30
-# Output to stderr: Result: 10 + 20 = 30
-```
-
-### Help
-
-Display usage information:
-
-```bash
-./ScaffoldProjectExample -h
-```
-
-## Understanding the Example Code
-
-The example application (`example.c`) demonstrates professional CLI application design using POSIX standards:
-
-### Code Structure
+**Purpose:** Demonstrates basic unreliable communication
 
 ```c
-/* Standard file template sections */
-/* Includes */              - Header files and library includes
-/* Definitions */           - Constants and buffer sizes
-/* Types */                 - Command enumerations
-/* Global Variables */      - Signal handling flags
-/* Forward Declarations */  - Function prototypes
-/* Functions */             - Implementation
-```
+#include <danp/danp.h>
 
-### Key Features
-
-1. **getopt() Argument Parsing**
-   - Standard POSIX option parsing
-   - Supports short options (-v, -h)
-   - Command-based interface
-
-2. **Signal Handling**
-   - Graceful shutdown on Ctrl+C (SIGINT)
-   - Uses sigaction() for reliable signal handling
-   - Demonstrates volatile sig_atomic_t flag
-
-3. **Error Handling**
-   - Checks library function return values
-   - Proper error messages to stderr
-   - Exit codes for success/failure
-
-4. **Verbose Logging**
-   - Optional verbose mode with -v flag
-   - Uses write() and dprintf() to stderr
-   - Doesn't mix logs with output
-
-5. **POSIX Compliance**
-   - Uses only standard POSIX libraries
-   - No external dependencies beyond the library itself
-   - Portable across Unix-like systems
-
-### POSIX Functions Demonstrated
-
-- `getopt()` - Command-line option parsing
-- `sigaction()` - Signal handling setup
-- `write()` - Low-level output (signal-safe)
-- `dprintf()` - Formatted output to file descriptor
-- `fprintf()`, `printf()` - Formatted output
-- `strcmp()` - String comparison
-- `atoi()` - String to integer conversion
-
-## Customizing the Example
-
-### Adding a New Command
-
-To add a new command that calls your library function:
-
-1. **Add command to enum** in the Types section:
-```c
-typedef enum
+int main(void)
 {
-    CMD_VERSION = 0,
-    CMD_ADD,
-    CMD_MULTIPLY,
-    CMD_FOO,
-    CMD_BAR,
-    CMD_FACTORIAL,
-    CMD_MY_NEW_CMD,  // Add here
-    CMD_NONE
-} command_t;
-```
+    /* Initialize DANP */
+    danp_config_t config = {.local_node = 1, .log_function = NULL};
+    danp_init(&config);
 
-2. **Add forward declaration**:
-```c
-static void doMyNewCmd(int32_t param, bool verbose);
-```
+    /* Register interface (CAN, UART, etc.) */
+    danp_interface_t my_interface = {
+        .name = "CAN0",
+        .address = 1,
+        .mtu = 64,
+        .tx_func = my_tx_function
+    };
+    danp_register_interface(&my_interface);
 
-3. **Add command string parsing** in main():
-```c
-else if (strcmp(cmdStr, "mynewcmd") == 0)
-{
-    command = CMD_MY_NEW_CMD;
+    /* Create and bind DGRAM socket to echo port */
+    danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(sock, 7);  /* Echo port */
+
+    /* Echo loop */
+    while (1)
+    {
+        char buffer[64];
+        uint16_t src_node, src_port;
+
+        int32_t len = danp_recv_from(sock, buffer, sizeof(buffer),
+                                      &src_node, &src_port, DANP_WAIT_FOREVER);
+
+        if (len > 0)
+        {
+            danp_send_to(sock, buffer, len, src_node, src_port);
+        }
+    }
+
+    return 0;
 }
 ```
 
-4. **Add case in switch statement**:
+**Features:**
+- Simple DGRAM socket
+- Echo server pattern
+- Interface registration
+- Send/receive operations
+
+---
+
+### 2. Stream Server/Client
+
+**Purpose:** Demonstrates reliable connection-oriented communication
+
+**Server:**
 ```c
-case CMD_MY_NEW_CMD:
-    if (optind + 1 >= argc)
+#include <danp/danp.h>
+
+int main(void)
+{
+    danp_config_t config = {.local_node = 1, .log_function = NULL};
+    danp_init(&config);
+
+    /* Register interface */
+    danp_register_interface(&my_interface);
+
+    /* Create STREAM socket and listen */
+    danp_socket_t *server = danp_socket(DANP_TYPE_STREAM);
+    danp_listen(server, 8080);
+
+    while (1)
     {
-        fprintf(stderr, "Error: 'mynewcmd' requires an argument\n");
-        return EXIT_FAILURE;
+        /* Accept connection (blocks until client connects) */
+        danp_socket_t *client = danp_accept(server, DANP_WAIT_FOREVER);
+
+        if (client)
+        {
+            char buffer[128];
+            int32_t len = danp_recv(client, buffer, sizeof(buffer), DANP_WAIT_FOREVER);
+
+            if (len > 0)
+            {
+                danp_send(client, buffer, len);  /* Echo back */
+            }
+
+            danp_close(client);
+        }
     }
-    doMyNewCmd((int32_t)atoi(argv[optind + 1]), verbose);
-    break;
+
+    return 0;
+}
 ```
 
-5. **Implement the function**:
+**Client:**
 ```c
-static void doMyNewCmd(int32_t param, bool verbose)
+#include <danp/danp.h>
+
+int main(void)
 {
-    if (verbose)
+    danp_config_t config = {.local_node = 2, .log_function = NULL};
+    danp_init(&config);
+
+    danp_register_interface(&my_interface);
+
+    /* Create STREAM socket and connect */
+    danp_socket_t *sock = danp_socket(DANP_TYPE_STREAM);
+    danp_connect(sock, 1, 8080);  /* Connect to node 1, port 8080 */
+
+    /* Send data */
+    const char *message = "Hello, Server!";
+    danp_send(sock, message, strlen(message));
+
+    /* Receive response */
+    char buffer[128];
+    int32_t len = danp_recv(sock, buffer, sizeof(buffer), DANP_WAIT_FOREVER);
+
+    if (len > 0)
     {
-        dprintf(STDERR_FILENO, "Calling my_library_function(%d)...\n", param);
+        buffer[len] = '\0';
+        printf("Received: %s\n", buffer);
     }
 
-    /* Call your library function here */
-    int32_t result = my_library_function(param);
+    danp_close(sock);
+    return 0;
+}
+```
 
-    printf("%d\n", result);
+**Features:**
+- Three-way handshake
+- Connection establishment
+- Reliable data transfer
+- Acknowledgments
 
-    if (verbose)
+---
+
+### 3. Multi-Interface Routing
+
+**Purpose:** Demonstrates routing packets across multiple interfaces
+
+```c
+#include <danp/danp.h>
+
+/* Two different network interfaces */
+static danp_interface_t can_interface = {
+    .name = "CAN0",
+    .address = 1,
+    .mtu = 64,
+    .tx_func = can_tx_function
+};
+
+static danp_interface_t uart_interface = {
+    .name = "UART0",
+    .address = 1,
+    .mtu = 128,
+    .tx_func = uart_tx_function
+};
+
+int main(void)
+{
+    danp_config_t config = {.local_node = 1, .log_function = NULL};
+    danp_init(&config);
+
+    /* Register both interfaces */
+    danp_register_interface(&can_interface);
+    danp_register_interface(&uart_interface);
+
+    /* Load routing table */
+    /* Nodes 10-19 via CAN, nodes 20-29 via UART */
+    const char *routes =
+        "10:CAN0,"
+        "11:CAN0,"
+        "20:UART0,"
+        "21:UART0";
+    danp_route_table_load(routes);
+
+    /* Create socket */
+    danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(sock, 100);
+
+    /* Send to different nodes (auto-routed) */
+    danp_send_to(sock, "CAN message", 11, 10, 100);    /* Goes via CAN */
+    danp_send_to(sock, "UART message", 12, 20, 100);   /* Goes via UART */
+
+    return 0;
+}
+```
+
+**Features:**
+- Multiple interface registration
+- Static routing table
+- Automatic route selection
+- Per-interface MTU
+
+---
+
+### 4. Zero-Copy Large Message Transfer (SFP)
+
+**Purpose:** Demonstrates efficient large message transfer with fragmentation
+
+```c
+#include <danp/danp.h>
+
+int main(void)
+{
+    danp_config_t config = {.local_node = 1, .log_function = NULL};
+    danp_init(&config);
+
+    danp_register_interface(&my_interface);
+
+    /* Create STREAM socket */
+    danp_socket_t *sock = danp_socket(DANP_TYPE_STREAM);
+    danp_connect(sock, 2, 9000);
+
+    /* Send large message (>256 bytes, auto-fragmented) */
+    uint8_t large_data[1024];
+    /* ... fill with data ... */
+
+    int32_t sent = danp_sfp_send(sock, large_data, sizeof(large_data));
+
+    if (sent > 0)
     {
-        dprintf(STDERR_FILENO, "Operation completed successfully\n");
+        printf("Sent %d bytes (fragmented)\n", sent);
+    }
+
+    danp_close(sock);
+    return 0;
+}
+```
+
+**Receiver:**
+```c
+#include <danp/danp.h>
+
+int main(void)
+{
+    danp_config_t config = {.local_node = 2, .log_function = NULL};
+    danp_init(&config);
+
+    danp_register_interface(&my_interface);
+
+    danp_socket_t *server = danp_socket(DANP_TYPE_STREAM);
+    danp_listen(server, 9000);
+
+    danp_socket_t *client = danp_accept(server, DANP_WAIT_FOREVER);
+
+    /* Receive large message (auto-reassembled) */
+    uint8_t buffer[2048];
+    int32_t received = danp_sfp_recv(client, buffer, sizeof(buffer), DANP_WAIT_FOREVER);
+
+    if (received > 0)
+    {
+        printf("Received %d bytes (reassembled from fragments)\n", received);
+    }
+
+    danp_close(client);
+    return 0;
+}
+```
+
+**Features:**
+- SFP (Small Fragmentation Protocol)
+- Automatic fragmentation (TX)
+- Automatic reassembly (RX)
+- Zero-copy buffer management
+- Handles messages larger than MTU
+
+---
+
+### 5. Telemetry System (DGRAM)
+
+**Purpose:** Real-world example of sensor data collection
+
+```c
+#include <danp/danp.h>
+
+/* Sensor node (sends telemetry) */
+typedef struct {
+    uint16_t sensor_id;
+    float temperature;
+    float humidity;
+    uint32_t timestamp;
+} telemetry_packet_t;
+
+int main(void)
+{
+    danp_config_t config = {.local_node = 10, .log_function = NULL};
+    danp_init(&config);
+
+    danp_register_interface(&can_interface);
+    danp_route_table_load("1:CAN0");  /* Gateway at node 1 */
+
+    danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(sock, 5000);
+
+    while (1)
+    {
+        telemetry_packet_t data = {
+            .sensor_id = 10,
+            .temperature = read_temperature(),
+            .humidity = read_humidity(),
+            .timestamp = get_timestamp()
+        };
+
+        /* Send to gateway node 1, port 5000 */
+        danp_send_to(sock, &data, sizeof(data), 1, 5000);
+
+        sleep_ms(1000);  /* Send every second */
+    }
+
+    return 0;
+}
+```
+
+**Gateway (collects telemetry):**
+```c
+#include <danp/danp.h>
+
+int main(void)
+{
+    danp_config_t config = {.local_node = 1, .log_function = NULL};
+    danp_init(&config);
+
+    danp_register_interface(&can_interface);
+
+    danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(sock, 5000);
+
+    while (1)
+    {
+        telemetry_packet_t data;
+        uint16_t src_node, src_port;
+
+        int32_t len = danp_recv_from(sock, &data, sizeof(data),
+                                      &src_node, &src_port, DANP_WAIT_FOREVER);
+
+        if (len == sizeof(data))
+        {
+            printf("Sensor %u: temp=%.1f°C, humidity=%.1f%%\n",
+                   data.sensor_id, data.temperature, data.humidity);
+        }
+    }
+
+    return 0;
+}
+```
+
+**Features:**
+- Unreliable (fast) telemetry
+- Structured data packets
+- Periodic transmission
+- Multiple sensor support
+
+---
+
+## Common Patterns
+
+### Interface Implementation
+
+All examples require implementing a transmit function for your hardware interface:
+
+```c
+static int32_t can_tx(void *iface_common, danp_packet_t *packet)
+{
+    /* Get CAN hardware handle */
+    can_handle_t *can = (can_handle_t *)iface_common;
+
+    /* Build frame: header + payload */
+    uint8_t frame[DANP_HEADER_SIZE + DANP_MAX_PACKET_SIZE];
+    memcpy(frame, &packet->header_raw, DANP_HEADER_SIZE);
+
+    if (packet->length > 0)
+    {
+        memcpy(frame + DANP_HEADER_SIZE, packet->payload, packet->length);
+    }
+
+    /* Transmit via hardware */
+    return can_transmit(can, frame, DANP_HEADER_SIZE + packet->length);
+}
+```
+
+### Receiving Packets
+
+When data arrives from hardware, call `danp_input()`:
+
+```c
+void can_rx_interrupt(void)
+{
+    uint8_t frame[128];
+    uint16_t length;
+
+    /* Get frame from CAN hardware */
+    if (can_receive(frame, &length) == 0)
+    {
+        /* Feed to DANP input */
+        danp_input(&can_interface, frame, length);
     }
 }
 ```
 
-6. **Update help text** in printHelp():
+### Error Handling
+
+All DANP functions return status codes:
+
 ```c
-printf("  mynewcmd <param>               Description of command\n");
-```
+int32_t rc = danp_send_to(sock, data, len, dest_node, dest_port);
 
-### Adding New Options
-
-To add a new command-line option (like `-o` for output file):
-
-1. **Update getopt string** in main():
-```c
-while ((opt = getopt(argc, argv, "vho:")) != -1)  // Added 'o:'
-```
-
-2. **Add case in switch**:
-```c
-case 'o':
-    outputFile = optarg;  // Declare variable at top of main()
-    break;
-```
-
-3. **Update help text**:
-```c
-printf("  -o <file>   Write output to file\n");
-```
-
-## Common Patterns Demonstrated
-
-### Simple Function Call (version)
-```c
-const char *version = scaffold_project_get_version();
-printf("%s\n", version);
-```
-
-### Function with Return Value (add)
-```c
-int32_t result = scaffold_project_add(a, b);
-printf("%d\n", result);
-```
-
-### Error Handling with Status Codes (multiply)
-```c
-scaffold_project_status_t status = scaffold_project_multiply(a, b, &result);
-if (status == SCAFFOLD_PROJECT_SUCCESS)
+if (rc < 0)
 {
-    printf("%d\n", result);
+    printf("Send failed\n");
+    /* Handle error */
 }
 else
 {
-    fprintf(stderr, "Error: multiply failed with status code %d\n", status);
-    exit(EXIT_FAILURE);
+    printf("Sent %d bytes\n", rc);
 }
 ```
 
-### String Processing with Buffers (foo)
+---
+
+## Integration with RTOS
+
+DANP works well with FreeRTOS, Zephyr, and other RTOS:
+
 ```c
-char output[BUFFER_SIZE];
-scaffold_project_status_t status = scaffold_project_foo(input, output, sizeof(output));
-if (status == SCAFFOLD_PROJECT_SUCCESS)
+/* Task 1: Receive and process */
+void task_network_rx(void *params)
 {
-    printf("%s\n", output);
+    danp_socket_t *sock = (danp_socket_t *)params;
+
+    while (1)
+    {
+        char buffer[128];
+        uint16_t src_node, src_port;
+
+        int32_t len = danp_recv_from(sock, buffer, sizeof(buffer),
+                                      &src_node, &src_port, 100);  /* 100ms timeout */
+
+        if (len > 0)
+        {
+            process_message(buffer, len, src_node);
+        }
+    }
+}
+
+/* Task 2: Periodic transmit */
+void task_network_tx(void *params)
+{
+    danp_socket_t *sock = (danp_socket_t *)params;
+
+    while (1)
+    {
+        send_status_update(sock);
+        vTaskDelay(pdMS_TO_TICKS(5000));  /* Every 5 seconds */
+    }
 }
 ```
 
-### Boolean Return Values (bar)
-```c
-bool isValid = scaffold_project_bar(value);
-printf("%s\n", isValid ? "valid" : "invalid");
-```
+---
 
-### Result Structures (factorial)
-```c
-scaffold_project_result_t result = scaffold_project_factorial(n);
-if (result.status == SCAFFOLD_PROJECT_SUCCESS)
-{
-    printf("%d\n", result.value);
-}
-else
-{
-    fprintf(stderr, "Error: factorial failed with status code %d\n", result.status);
-}
-```
+## Dependencies
 
-## Design Principles
+Examples require:
+- **DANP Library**: Installed via `./ci/install.sh`
+- **OSAL**: Operating System Abstraction Layer
+- **Hardware Interface**: CAN, UART, SPI, etc. (user-provided)
 
-This example follows these CLI design principles:
+---
 
-1. **Separate output from logging**: Results go to stdout, logs/errors to stderr
-2. **Exit codes**: Return EXIT_SUCCESS (0) or EXIT_FAILURE (1)
-3. **Help text**: Always provide -h for usage information
-4. **Error messages**: Clear, actionable error messages
-5. **Argument validation**: Check argument count before parsing
-6. **Signal handling**: Clean shutdown on interruption
-7. **POSIX compliance**: Portable, standard library usage
+## Building Your Own Application
 
-## Advanced: Piping and Redirection
+1. **Include DANP headers**
+   ```c
+   #include <danp/danp.h>
+   ```
 
-The example is designed to work well with Unix pipes and redirection:
+2. **Link against DANP**
+   ```cmake
+   find_package(Danp REQUIRED)
+   target_link_libraries(myapp PRIVATE Danp::Danp)
+   ```
 
-```bash
-# Output only (stdout)
-./ScaffoldProjectExample add 5 3 > result.txt
+3. **Initialize library**
+   ```c
+   danp_config_t config = {.local_node = YOUR_NODE_ID};
+   danp_init(&config);
+   ```
 
-# Errors only (stderr)
-./ScaffoldProjectExample add 5 3 2> errors.txt
+4. **Register interface(s)**
+   ```c
+   danp_register_interface(&your_interface);
+   ```
 
-# Verbose output to stderr, result to stdout
-./ScaffoldProjectExample -v add 5 3 2> log.txt > result.txt
+5. **Load routing table** (optional)
+   ```c
+   danp_route_table_load("node:interface,...");
+   ```
 
-# Chain commands
-./ScaffoldProjectExample add 5 3 | xargs ./ScaffoldProjectExample multiply 2
-```
+6. **Create socket and communicate**
+   ```c
+   danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
+   danp_bind(sock, port);
+   /* ... send/receive ... */
+   ```
 
-## Migration Notes
+---
 
-After running `./scripts/migration.sh YourLibName`, the example files will be automatically updated:
+## Debugging Tips
 
-- `example.c` - All `scaffold_project_*` calls → `your_lib_name_*`
-- `ScaffoldProjectExample` → `example_your_lib_name_cli` (executable)
-- Function names, types, and constants automatically renamed
+1. **Enable test logging during development**
+   ```bash
+   cmake -B build -DBUILD_TESTS=ON -DBUILD_TESTS_WITH_LOGS=ON
+   ```
 
-Make sure to:
-1. Update the command implementations to match your actual API
-2. Add/remove commands based on your library's functionality
-3. Update help text to describe your library's purpose
+2. **Check routing table**
+   ```c
+   danp_print_stats(printf);  /* Shows routing and buffer stats */
+   ```
+
+3. **Verify interface registration**
+   - Ensure `tx_func` is not NULL
+   - Verify MTU is set correctly
+   - Check interface name matches routing table
+
+4. **Monitor buffer pool**
+   ```c
+   uint32_t free_count = danp_buffer_get_free_count();
+   printf("Free buffers: %u/%u\n", free_count, DANP_POOL_SIZE);
+   ```
+
+---
+
+## Performance Considerations
+
+- **DGRAM**: Faster, no handshake overhead
+- **STREAM**: Reliable but slower (handshake + ACKs)
+- **SFP**: Adds fragmentation overhead for large messages
+- **Zero-Copy**: Eliminates memcpy for large transfers
+- **Buffer Pool**: Pre-allocated, no malloc in runtime
+
+---
 
 ## Further Reading
 
-- `../include/scaffold_project/scaffold_project.h` - Full API documentation
-- `../docs/FORMATTING.md` - Code style guidelines
-- `../test/` - Unit test examples
-- `man getopt` - POSIX getopt documentation
-- `man sigaction` - Signal handling documentation
+- [DANP API Documentation](../include/danp/danp.h)
+- [Test Examples](../test/) - Real usage patterns
+- [Main README](../README.md) - Complete API reference
+- [CI Scripts](../ci/README.md) - Build and install guide
+
+---
+
+## Repository
+
+GitHub: [dogukanarat/danp](https://github.com/dogukanarat/danp)

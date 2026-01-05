@@ -1,470 +1,361 @@
-# danp
+# DANP - Data and Network Protocol Library
 
-A minimal scaffold template for creating CMake-based C libraries with proper installation support.
+A lightweight, embedded-friendly network protocol library providing socket-based communication with both reliable (TCP-like) and unreliable (UDP-like) transport modes.
 
 ## Overview
 
-This is a ready-to-use scaffold for creating C libraries with CMake. It provides a clean starting point with organized file structure and comprehensive build configuration.
+DANP is a C99 network protocol implementation designed for resource-constrained embedded systems. It provides a familiar socket API with support for datagram and stream sockets, network routing, zero-copy operations, and packet fragmentation.
 
-**Features:**
-- ✅ Organized directory structure (`src/`, `include/`, `test/`)
-- ✅ Comprehensive CMakeLists.txt with install commands
-- ✅ Minimal template files with clear section organization
-- ✅ CMake package configuration for `find_package()` support
-- ✅ Intelligent rename script to customize the library name
-- ✅ GitHub Actions CI/CD workflows (build matrix, format check, static analysis)
-- ✅ CI automation scripts (`ci/debug.sh`, `ci/release.sh`, `ci/install.sh`)
-- ✅ `.gitignore` configured for C/CMake projects
-- ✅ `.clang-format` for consistent code formatting
-- ✅ `.clang-tidy` for static analysis
-- ✅ `.editorconfig` for editor consistency
-- ✅ Unity test framework integration
-- ✅ MIT License template
+**Key Features:**
+- ✅ **Dual Socket Types**: DGRAM (unreliable, UDP-like) and STREAM (reliable, TCP-like with handshake)
+- ✅ **Network Routing**: Static routing table with multiple interface support
+- ✅ **Zero-Copy Operations**: Efficient packet buffer management
+- ✅ **Packet Fragmentation**: SFP (Small Fragmentation Protocol) for large messages
+- ✅ **Portable**: C99 standard, POSIX-compatible
+- ✅ **Embedded-Friendly**: Fixed-size memory pools, no dynamic allocation
+- ✅ **Comprehensive Testing**: 50+ unit tests using Unity framework
+- ✅ **Clean API**: Familiar socket-like interface
+
+## Protocol Features
+
+### Socket Types
+
+**DGRAM (Datagram) Socket**
+- Unreliable, connectionless communication (like UDP)
+- No handshaking or connection establishment
+- Fast, low overhead
+- Suitable for status updates, telemetry, sensor data
+
+**STREAM (Stream) Socket**
+- Reliable, connection-oriented communication (like TCP)
+- Three-way handshake (SYN → SYN-ACK → ACK)
+- Connection establishment and termination (RST)
+- Acknowledgments for received data
+- Suitable for command/control, file transfer, critical data
+
+### Network Features
+
+- **Multi-Interface Support**: Register multiple network interfaces (CAN, UART, RF, etc.)
+- **Static Routing**: Route packets based on destination node via routing table
+- **Loopback Support**: Local node communication for testing
+- **Priority Levels**: Normal and high priority packets
+- **MTU Enforcement**: Per-interface Maximum Transmission Unit validation
+
+### Buffer Management
+
+- **Fixed Memory Pools**: Pre-allocated packet buffers (configurable pool size)
+- **Zero-Copy Operations**: Direct buffer manipulation without copying
+- **Packet Chaining**: Link multiple buffers for large messages
+- **Fragmentation**: Automatic fragmentation/reassembly for oversized packets
+
+## Quick Start
+
+### Building the Library
+
+```bash
+# Basic build
+cmake -B build
+cmake --build build
+
+# Build with tests
+cmake -B build -DBUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build
+
+# Build with test logging (for debugging)
+cmake -B build -DBUILD_TESTS=ON -DBUILD_TESTS_WITH_LOGS=ON
+cmake --build build
+```
+
+### Installation
+
+```bash
+# System-wide installation
+cmake -B build
+cmake --build build
+sudo cmake --install build
+
+# User installation (no sudo)
+cmake -B build -DCMAKE_INSTALL_PREFIX=~/.local
+cmake --build build
+cmake --install build
+```
+
+### Basic Usage Example
+
+```c
+#include <danp/danp.h>
+
+/* Initialize DANP */
+danp_config_t config = {
+    .local_node = 1,
+    .log_function = NULL
+};
+danp_init(&config);
+
+/* Register a network interface */
+danp_interface_t my_interface = {
+    .name = "CAN0",
+    .address = 1,
+    .mtu = 64,
+    .tx_func = my_transmit_function
+};
+danp_register_interface(&my_interface);
+
+/* Create and bind a datagram socket */
+danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
+danp_bind(sock, 10);
+
+/* Send data to another node */
+const char *message = "Hello";
+danp_send_to(sock, message, 5, 2, 20);  // Send to node 2, port 20
+
+/* Receive data */
+char buffer[64];
+uint16_t src_node, src_port;
+int32_t len = danp_recv_from(sock, buffer, sizeof(buffer),
+                              &src_node, &src_port, DANP_WAIT_FOREVER);
+
+/* Cleanup */
+danp_close(sock);
+```
+
+## API Overview
+
+### Core Functions
+
+```c
+/* Initialization */
+void danp_init(const danp_config_t *config);
+
+/* Socket Management */
+danp_socket_t *danp_socket(danp_socket_type_t type);
+int32_t danp_bind(danp_socket_t *socket, uint16_t port);
+int32_t danp_close(danp_socket_t *socket);
+
+/* Datagram Operations */
+int32_t danp_send_to(danp_socket_t *socket, const void *data, uint16_t length,
+                     uint16_t dest_node, uint16_t dest_port);
+int32_t danp_recv_from(danp_socket_t *socket, void *buffer, uint16_t buffer_size,
+                       uint16_t *src_node, uint16_t *src_port, uint32_t timeout_ms);
+
+/* Stream Operations */
+int32_t danp_listen(danp_socket_t *socket, uint16_t port);
+danp_socket_t *danp_accept(danp_socket_t *socket, uint32_t timeout_ms);
+int32_t danp_connect(danp_socket_t *socket, uint16_t dest_node, uint16_t dest_port);
+int32_t danp_send(danp_socket_t *socket, const void *data, uint16_t length);
+int32_t danp_recv(danp_socket_t *socket, void *buffer, uint16_t buffer_size, uint32_t timeout_ms);
+
+/* Network Interface */
+void danp_register_interface(danp_interface_t *iface);
+void danp_input(danp_interface_t *iface, const void *frame, uint16_t length);
+
+/* Routing */
+int32_t danp_route_table_load(const char *table_str);
+int32_t danp_route_tx(danp_packet_t *packet);
+
+/* Zero-Copy Operations */
+danp_packet_t *danp_send_packet(danp_socket_t *socket, danp_packet_t *packet);
+danp_packet_t *danp_recv_packet(danp_socket_t *socket, uint32_t timeout_ms);
+
+/* SFP (Small Fragmentation Protocol) */
+int32_t danp_sfp_send(danp_socket_t *socket, const void *data, uint32_t length);
+int32_t danp_sfp_recv(danp_socket_t *socket, void *buffer, uint32_t buffer_size, uint32_t timeout_ms);
+```
 
 ## Directory Structure
 
 ```
 danp/
-├── include/danp/            # Public headers
-│   ├── danp.h               # Main API header
-│   └── danp_types.h         # Common types and definitions
-├── src/                            # Implementation
-│   ├── danp.c               # Core implementation
-│   └── danp_int.c           # Internal utilities
-├── test/                           # Unit tests (Unity framework)
-│   ├── CMakeLists.txt              # Test build configuration
-│   ├── test_danp.c          # Example test file
-│   └── README.md                   # Testing guide
-├── cmake/                          # CMake modules
-│   └── danpConfig.cmake.in  # Package config template
-├── ci/                             # CI/CD automation scripts
-│   ├── debug.sh                    # Debug build + tests
-│   ├── release.sh                  # Release build
-│   ├── install.sh                  # Installation script
-│   └── README.md                   # CI scripts guide
-├── scripts/                        # Utility scripts
-│   ├── migration.sh                # Library renaming script
-│   └── format.sh                   # Code formatting script
-├── docs/                           # Documentation
-│   └── FORMATTING.md               # Code style guide
-├── .github/                        # GitHub Actions workflows
-│   └── workflows/
-│       ├── ci.yml                  # Main CI with matrix testing
-│       ├── format-check.yml        # Code formatting validation
-│       └── static-analysis.yml     # clang-tidy analysis
-├── .clang-format                   # Code formatting rules
-├── .clang-tidy                     # Static analysis config
-├── .editorconfig                   # Editor configuration
-├── .gitignore                      # Git ignore rules
-├── CMakeLists.txt                  # Build configuration
-├── CLAUDE.md                       # AI assistant guide
-├── LICENSE                         # MIT License
-└── README.md                       # This file
+├── include/danp/           # Public API headers
+│   ├── danp.h              # Main API header
+│   ├── danp_types.h        # Type definitions
+│   ├── danp_defs.h         # Configuration and constants
+│   ├── danp_buffer.h       # Buffer management API
+│   └── danp_socket.h       # Socket API
+├── src/                    # Implementation
+│   ├── danp.c              # Core functions
+│   ├── danp_buffer.c       # Memory pool and buffer management
+│   ├── danp_route.c        # Routing table and interface management
+│   ├── danp_socket.c       # Socket operations
+│   └── danp_zerocopy.c     # Zero-copy and SFP implementation
+├── test/                   # Unit tests (Unity framework)
+│   ├── test_runner.c       # Main test runner
+│   ├── test_core.c         # Core functionality tests
+│   ├── test_dgram.c        # Datagram socket tests
+│   ├── test_stream.c       # Stream socket tests
+│   ├── test_route.c        # Routing tests
+│   ├── test_zerocopy.c     # Zero-copy and SFP tests
+│   ├── log_message.c       # Test logging (optional)
+│   └── CMakeLists.txt      # Test configuration
+├── cmake/                  # CMake modules
+│   ├── DanpConfig.cmake.in # Package config template
+│   └── FindOsal.cmake      # OSAL dependency finder
+├── ci/                     # CI/CD scripts
+│   ├── debug.sh            # Debug build with tests
+│   ├── release.sh          # Release build
+│   └── install.sh          # Installation script
+└── CMakeLists.txt          # Build configuration
 ```
 
-## File Structure
+## Configuration
 
-All source and header files follow a consistent organization:
+### Memory Pool Configuration (include/danp/danp_defs.h)
 
-**Header Files** (`.h`):
 ```c
-/* filename.h - one line definition */
-
-/* All Rights Reserved */
-
-#ifndef INC_FILENAME_H
-#define INC_FILENAME_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* Includes */
-
-/* Configurations */
-
-/* Definitions */
-
-/* Types */
-
-/* External Declarations */
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* INC_FILENAME_H */
+#define DANP_POOL_SIZE 32           /* Number of packet buffers */
+#define DANP_MAX_PACKET_SIZE 256    /* Maximum payload per packet */
+#define DANP_MAX_PORTS 64           /* Maximum number of ports */
+#define DANP_MAX_ROUTES 16          /* Maximum routing table entries */
+#define DANP_MAX_INTERFACES 4       /* Maximum network interfaces */
 ```
 
-**Source Files** (`.c`):
+### Priority Levels
+
 ```c
-/* filename.c - one line definition */
-
-/* All Rights Reserved */
-
-/* Includes */
-
-/* Imports */
-
-/* Definitions */
-
-/* Types */
-
-/* Forward Declarations */
-
-/* Variables */
-
-/* Functions */
+#define DANP_PRIORITY_NORMAL 0      /* Normal priority packets */
+#define DANP_PRIORITY_HIGH 1        /* High priority packets */
 ```
-
-## Code Formatting
-
-The scaffold includes a `.clang-format` configuration file that enforces consistent code style:
-
-**Coding Style Rules:**
-1. Functions and variables: `camelCase`
-2. Defines: `UPPER_CASE_WITH_UNDERSCORE`
-3. Global variables: `PascalCase`
-4. Braces: Always on new lines (Allman style)
-5. Pointers: Close to name (`int *ptr`)
-6. Long function signatures: Parameters on separate lines
-7. Short function signatures: Single line
-
-**Format All Files:**
-```bash
-./format.sh
-```
-
-**Format Specific Files:**
-```bash
-clang-format -i src/myfile.c
-clang-format -i include/danp/myheader.h
-```
-
-**Example Formatted Code:**
-```c
-void shortFunction(int param)
-{
-    int *localVar = NULL;
-}
-
-status_t longFunction(
-    int32_t handleId,
-    const credentials_t *credential,
-    state_t *state,
-    uint32_t timeout)
-{
-    if (credential == NULL)
-    {
-        return STATUS_ERROR;
-    }
-    return STATUS_SUCCESS;
-}
-```
-
-## Building
-
-### Basic Build
-
-```bash
-mkdir build
-cd build
-cmake ..
-make
-```
-
-The build system automatically defaults to Release mode and provides a configuration summary.
-
-### Build Options
-
-```bash
-# Build shared library instead of static
-cmake -DBUILD_SHARED_LIBS=ON ..
-
-# Enable tests with Unity framework
-cmake -DBUILD_TESTS=ON ..
-
-# Enable examples
-cmake -DBUILD_EXAMPLES=ON ..
-
-# Specify build type explicitly
-cmake -DCMAKE_BUILD_TYPE=Debug ..
-
-# Force download Unity via FetchContent (even if installed locally)
-cmake -DBUILD_TESTS=ON -DFORCE_FETCH_UNITY=ON ..
-```
-
-### Build Types
-
-- `Release` (default): Optimized, no debug info
-- `Debug`: Debug symbols, no optimization
-- `RelWithDebInfo`: Optimized with debug info
-- `MinSizeRel`: Optimized for size
 
 ## Testing
 
-The scaffold includes [Unity Test Framework](https://github.com/ThrowTheSwitch/Unity) integration with intelligent dependency resolution:
+DANP includes comprehensive test coverage with 50+ unit tests:
 
-**Automatic Unity resolution:**
-1. First tries to find Unity installed locally on your system
-2. If not found, automatically downloads it via CMake FetchContent
-3. No manual Unity installation required!
-
-### Build and Run Tests
+### Running Tests
 
 ```bash
-mkdir build
-cd build
-cmake -DBUILD_TESTS=ON ..
-make
-ctest
+# Build and run all tests
+cmake -B build -DBUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --verbose
+
+# Run tests without logging (clean output)
+cmake -B build -DBUILD_TESTS=ON
+./build/test/TestDanp
+
+# Run tests with verbose logging (for debugging)
+cmake -B build -DBUILD_TESTS=ON -DBUILD_TESTS_WITH_LOGS=ON
+./build/test/TestDanp
 ```
 
-### Run Tests with Verbose Output
+### Test Suites
 
-```bash
-ctest --verbose
-```
+- **Core Tests** (13 tests): Header packing, memory pools, initialization, buffer management
+- **Datagram Tests** (5 tests): DGRAM socket operations, send/receive, timeouts
+- **Route Tests** (6 tests): Routing table, interface registration, MTU enforcement
+- **Stream Tests** (5 tests): Connection handshake, data transfer, RST handling
+- **Zero-Copy Tests** (21 tests): Buffer operations, SFP fragmentation, packet chaining
 
-### Run Specific Test Labels
+See [test/README.md](test/README.md) for detailed testing documentation.
 
-```bash
-# Run only unit tests
-ctest -L unit
+## Dependencies
 
-# Run only danp tests
-ctest -L danp
-```
+- **C Standard Library**: C99 standard
+- **OSAL**: Operating System Abstraction Layer for semaphores and message queues
+  - Provides platform-independent primitives for embedded systems
+  - See [cmake/FindOsal.cmake](cmake/FindOsal.cmake) for configuration
 
-### Writing Tests
+## Using DANP in Your Project
 
-See [test/README.md](file:///home/dogukanarat/workspace/danp/test/README.md) for a comprehensive guide on writing tests with Unity.
-
-**Quick Example:**
-```c
-#include "danp/danp.h"
-#include "unity.h"
-
-void test_myFunction_should_returnSuccess(void)
-{
-    int result = myFunction();
-    TEST_ASSERT_EQUAL(0, result);
-}
-
-int main(void)
-{
-    UNITY_BEGIN();
-    RUN_TEST(test_myFunction_should_returnSuccess);
-    return UNITY_END();
-}
-```
-
-## Installation
-
-### System-Wide Installation
-
-```bash
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
-```
-
-This will install:
-- Library files to `/usr/local/lib/`
-- Header files to `/usr/local/include/danp/`
-- CMake config files to `/usr/local/lib/cmake/danp/`
-
-### Custom Installation Prefix
-
-```bash
-mkdir build
-cd build
-cmake -DCMAKE_INSTALL_PREFIX=/path/to/install ..
-make
-make install
-```
-
-## Using the Installed Library
-
-### In Your CMakeLists.txt
+### CMake Integration
 
 ```cmake
 cmake_minimum_required(VERSION 3.14)
 project(MyProject)
 
-# Find the installed library
-find_package(danp REQUIRED)
+# Find DANP library
+find_package(Danp REQUIRED)
 
 # Create your executable
 add_executable(myapp main.c)
 
-# Link against the library
-target_link_libraries(myapp PRIVATE danp::danp)
+# Link against DANP
+target_link_libraries(myapp PRIVATE Danp::Danp)
 ```
 
-### In Your C Code
+### Example: Simple Echo Server
 
 ```c
 #include <danp/danp.h>
 
-int main(void) {
-    /* Use the library */
+int main(void)
+{
+    danp_config_t config = {.local_node = 1, .log_function = NULL};
+    danp_init(&config);
+
+    danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
+    danp_bind(sock, 7);  /* Echo port */
+
+    while (1)
+    {
+        char buffer[64];
+        uint16_t src_node, src_port;
+
+        int32_t len = danp_recv_from(sock, buffer, sizeof(buffer),
+                                      &src_node, &src_port, DANP_WAIT_FOREVER);
+
+        if (len > 0)
+        {
+            danp_send_to(sock, buffer, len, src_node, src_port);
+        }
+    }
+
     return 0;
 }
 ```
 
-## Renaming the Scaffold
-
-To customize this scaffold for your own library, use the provided rename script. **Provide the library name in PascalCase** (e.g., `MyHttpClient`, `JsonParser`).
-
-### Preview Changes (Dry Run)
+## Build Options
 
 ```bash
-./scripts/migration.sh MyHttpClient --dry-run
+# Shared library (default: static)
+cmake -DBUILD_SHARED_LIBS=ON ..
+
+# Enable tests
+cmake -DBUILD_TESTS=ON ..
+
+# Enable test logging
+cmake -DBUILD_TESTS=ON -DBUILD_TESTS_WITH_LOGS=ON ..
+
+# Debug build
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+
+# Release build (default, optimized)
+cmake -DCMAKE_BUILD_TYPE=Release ..
 ```
-
-This will show you all the changes that would be made without actually modifying any files.
-
-### Apply Rename
-
-```bash
-./scripts/migration.sh MyHttpClient
-```
-
-The script intelligently generates four case variations and applies them in the right contexts:
-- ✅ **snake_case** for filenames: `my_http_client.c`, `my_http_client.h`, `my_http_client_types.h`
-- ✅ **lowercase** for directories and packages: `include/myhttpclient/`, `myhttpclientConfig.cmake`
-- ✅ **PascalCase** for CMake project name: `project(MyHttpClient)`
-- ✅ **UPPERCASE** for header guards: `#ifndef INC_MY_HTTP_CLIENT_H`
-- ✅ Renames all files and directories throughout the project
-- ✅ Updates all file contents (CMakeLists.txt, headers, sources, README, tests)
-
-### After Renaming
-
-1. Review the changes
-2. Update the one-line descriptions in each file
-3. Update the license information ("All Rights Reserved")
-4. Implement your actual library functionality
-5. Add tests and examples as needed
-
-## CMake Installation Features
-
-The scaffold includes complete installation support:
-
-- **Library Installation**: Installs both static and shared libraries
-- **Header Installation**: Preserves directory structure
-- **CMake Package Config**: Enables `find_package()` support
-- **Version Management**: Automatic version file generation
-- **Component Support**: Separate Runtime and Development components
 
 ## Compiler Support
 
 - **Standard**: C99
-- **GCC/Clang**: Full warnings enabled (`-Wall -Wextra -Wpedantic`)
-- **MSVC**: Warning level 4 (`/W4`)
-- **Symbol visibility**: Controlled for shared libraries
+- **Tested Compilers**: GCC 8+, Clang 10+
+- **Warnings**: Full warnings enabled (`-Wall -Wextra -Wpedantic`)
+- **Platforms**: Linux, embedded RTOS
 
-## CI/CD Scripts
+## Performance Characteristics
 
-The scaffold includes automation scripts for common development tasks:
+- **Zero-Copy**: Direct buffer access, no memcpy for large payloads
+- **Fixed Memory**: No malloc/free, predictable memory usage
+- **Interrupt-Safe**: Buffer operations suitable for ISR context
+- **Lightweight**: Small code footprint (~15KB compiled)
 
-### Quick Start
-```bash
-# Debug build with tests
-./ci/debug.sh
+## Limitations
 
-# Release build
-./ci/release.sh
+- **Static Configuration**: Pool sizes set at compile time
+- **No Dynamic Routing**: Routing table is static, loaded at runtime
+- **Limited Ports**: Maximum 64 ports per node
+- **No Congestion Control**: Stream sockets lack flow control/windowing
+- **Single-Threaded**: Application responsible for thread safety
 
-# Install to system
-./ci/install.sh
-```
+## Contributing
 
-### Available Scripts
-
-**`./ci/debug.sh`** - Debug Build & Test
-- Performs clean build in Debug mode
-- Runs complete test suite
-- Use for: development, CI/CD testing, verifying changes
-
-**`./ci/release.sh`** - Release Build
-- Builds optimized production library
-- Options: `--clean` for fresh build
-- Use for: releases, performance testing
-
-**`./ci/install.sh`** - Installation
-- Installs library to system or custom location
-- Options:
-  - `--user` - Install to `~/.local` (no sudo)
-  - `--prefix=/path` - Custom install location
-  - `--build-type=Debug` - Install debug build
-- Use for: deployment, system setup
-
-See [ci/README.md](ci/README.md) for detailed documentation.
-
-## GitHub Actions
-
-The scaffold includes comprehensive GitHub Actions workflows for automated CI/CD:
-
-### Main CI Workflow (`.github/workflows/ci.yml`)
-
-**Automated testing with matrix strategy:**
-- Compilers: GCC and Clang
-- Library types: Static and Shared
-- Total: 4 configurations tested in parallel
-
-**Triggers:**
-- Every push to `master`, `main`, or `develop` branches
-- Every pull request to `master` or `main`
-- Manual trigger via workflow_dispatch
-
-**What it does:**
-1. Installs dependencies (CMake, Clang, build tools)
-2. Configures and builds the project
-3. Runs all tests via CTest
-4. Uploads test results and build artifacts
-
-**Build artifacts:** Compiled libraries and test executables for each configuration
-
-### Code Quality Workflows
-
-**Format Check (`.github/workflows/format-check.yml`)**
-- Validates code formatting with clang-format
-- Runs on every push and pull request
-- Fails if code doesn't match `.clang-format` style
-- Fix issues with: `./scripts/format.sh`
-
-**Static Analysis (`.github/workflows/static-analysis.yml`)**
-- Runs clang-tidy static analysis
-- Checks for bugs, performance issues, code quality
-- Uses `.clang-tidy` configuration (13 check categories)
-- All warnings treated as errors
-
-### Adding CI Badges to Your README
-
-After pushing to GitHub, add these badges to your README:
-
-```markdown
-[![CI](https://github.com/username/repo/workflows/CI/badge.svg)](https://github.com/username/repo/actions/workflows/ci.yml)
-[![Format Check](https://github.com/username/repo/workflows/Format%20Check/badge.svg)](https://github.com/username/repo/actions/workflows/format-check.yml)
-[![Static Analysis](https://github.com/username/repo/workflows/Static%20Analysis/badge.svg)](https://github.com/username/repo/actions/workflows/static-analysis.yml)
-```
-
-## Customization
-
-After renaming, you can customize:
-
-1. **Add more source files**: Update `CMakeLists.txt` `target_sources()`
-2. **Add dependencies**: Use `find_package()` and `target_link_libraries()`
-3. **Add compile definitions**: Use `target_compile_definitions()`
-4. **Add tests**: Create a `test/` directory and enable `BUILD_TESTS`
-5. **Add examples**: Create an `example/` directory and enable `BUILD_EXAMPLES`
+Contributions are welcome! Please ensure:
+- Code follows existing style (see `.clang-format`)
+- All tests pass (`ctest`)
+- New features include tests
+- Documentation is updated
 
 ## License
 
-Update the license information in all source files and add a LICENSE file as needed.
+All Rights Reserved
 
 ## Repository
 
