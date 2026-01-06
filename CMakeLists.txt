@@ -3,6 +3,7 @@
 # ==============================================================================
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
+# TODO: Update the project name and description after running scripts/migration.sh.
 project(Danp
     VERSION 1.0.0
     DESCRIPTION "A scaffold library for CMake projects"
@@ -99,6 +100,11 @@ target_compile_options(Danp
         $<$<C_COMPILER_ID:MSVC>:
             /W4             # Warning level 4
         >
+)
+
+target_compile_definitions(ScaffoldProject
+    PRIVATE
+        SCAFFOLD_PROJECT_EXPORTS
 )
 
 # ==============================================================================

@@ -184,7 +184,7 @@ After installation, use in your CMakeLists.txt:
 cmake_minimum_required(VERSION 3.14)
 project(MyNetworkApp)
 
-# Find the installed DANP library
+# Find the installed library
 find_package(Danp REQUIRED)
 
 # Link your executable against it

@@ -1,10 +1,6 @@
 # DANP Example Applications
 
-This directory contains example applications demonstrating how to use the DANP (Data and Network Protocol) library in real-world scenarios.
-
-## Overview
-
-DANP examples showcase common networking patterns using both DGRAM (unreliable, UDP-like) and STREAM (reliable, TCP-like) sockets. Each example demonstrates proper initialization, interface registration, routing, and communication.
+This directory contains example applications that demonstrate how to use the DANP (Data and Network Protocol) library in various networking scenarios.
 
 ## Building Examples
 
@@ -15,35 +11,31 @@ cmake -B build -DBUILD_EXAMPLES=ON
 cmake --build build
 ```
 
-## Planned Examples
+## Example Overview
 
-### 1. Echo Server (DGRAM)
+The examples demonstrate practical usage patterns for the DANP library, including:
+- **Embedded-safe implementation** - Works on OSAL/RTOS/bare-metal targets
+- **Socket operations** - DGRAM and STREAM socket types
+- **Network interfaces** - CAN, UART, RF, and other transports
+- **Protocol features** - Fragmentation, zero-copy, routing
 
-**Purpose:** Demonstrates basic unreliable communication
+## Available Examples
+
+### 1. Basic Echo Server (DGRAM)
+
+**Purpose:** Simple unreliable echo service using datagram sockets
 
 ```c
 #include <danp/danp.h>
 
 int main(void)
 {
-    /* Initialize DANP */
     danp_config_t config = {.local_node = 1, .log_function = NULL};
     danp_init(&config);
 
-    /* Register interface (CAN, UART, etc.) */
-    danp_interface_t my_interface = {
-        .name = "CAN0",
-        .address = 1,
-        .mtu = 64,
-        .tx_func = my_tx_function
-    };
-    danp_register_interface(&my_interface);
-
-    /* Create and bind DGRAM socket to echo port */
     danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
     danp_bind(sock, 7);  /* Echo port */
 
-    /* Echo loop */
     while (1)
     {
         char buffer[64];
@@ -63,16 +55,15 @@ int main(void)
 ```
 
 **Features:**
-- Simple DGRAM socket
-- Echo server pattern
-- Interface registration
-- Send/receive operations
+- Unreliable (UDP-like) communication
+- Fast, low overhead
+- Loopback or remote nodes
 
 ---
 
-### 2. Stream Server/Client
+### 2. Reliable Client-Server (STREAM)
 
-**Purpose:** Demonstrates reliable connection-oriented communication
+**Purpose:** Connection-oriented reliable data transfer with handshake
 
 **Server:**
 ```c
@@ -83,30 +74,26 @@ int main(void)
     danp_config_t config = {.local_node = 1, .log_function = NULL};
     danp_init(&config);
 
-    /* Register interface */
-    danp_register_interface(&my_interface);
-
-    /* Create STREAM socket and listen */
     danp_socket_t *server = danp_socket(DANP_TYPE_STREAM);
-    danp_listen(server, 8080);
+    danp_listen(server, 80);
 
     while (1)
     {
-        /* Accept connection (blocks until client connects) */
         danp_socket_t *client = danp_accept(server, DANP_WAIT_FOREVER);
-
-        if (client)
+        if (client == NULL)
         {
-            char buffer[128];
-            int32_t len = danp_recv(client, buffer, sizeof(buffer), DANP_WAIT_FOREVER);
-
-            if (len > 0)
-            {
-                danp_send(client, buffer, len);  /* Echo back */
-            }
-
-            danp_close(client);
+            continue;
         }
+
+        char buffer[128];
+        int32_t received = danp_recv(client, buffer, sizeof(buffer), 5000);
+
+        if (received > 0)
+        {
+            danp_send(client, "ACK", 3);
+        }
+
+        danp_close(client);
     }
 
     return 0;
@@ -122,156 +109,19 @@ int main(void)
     danp_config_t config = {.local_node = 2, .log_function = NULL};
     danp_init(&config);
 
-    danp_register_interface(&my_interface);
+    danp_socket_t *client = danp_socket(DANP_TYPE_STREAM);
 
-    /* Create STREAM socket and connect */
-    danp_socket_t *sock = danp_socket(DANP_TYPE_STREAM);
-    danp_connect(sock, 1, 8080);  /* Connect to node 1, port 8080 */
-
-    /* Send data */
-    const char *message = "Hello, Server!";
-    danp_send(sock, message, strlen(message));
-
-    /* Receive response */
-    char buffer[128];
-    int32_t len = danp_recv(sock, buffer, sizeof(buffer), DANP_WAIT_FOREVER);
-
-    if (len > 0)
+    if (danp_connect(client, 1, 80) == 0)
     {
-        buffer[len] = '\0';
-        printf("Received: %s\n", buffer);
-    }
+        danp_send(client, "Hello Server", 12);
 
-    danp_close(sock);
-    return 0;
-}
-```
+        char response[64];
+        int32_t len = danp_recv(client, response, sizeof(response), 5000);
 
-**Features:**
-- Three-way handshake
-- Connection establishment
-- Reliable data transfer
-- Acknowledgments
-
----
-
-### 3. Multi-Interface Routing
-
-**Purpose:** Demonstrates routing packets across multiple interfaces
-
-```c
-#include <danp/danp.h>
-
-/* Two different network interfaces */
-static danp_interface_t can_interface = {
-    .name = "CAN0",
-    .address = 1,
-    .mtu = 64,
-    .tx_func = can_tx_function
-};
-
-static danp_interface_t uart_interface = {
-    .name = "UART0",
-    .address = 1,
-    .mtu = 128,
-    .tx_func = uart_tx_function
-};
-
-int main(void)
-{
-    danp_config_t config = {.local_node = 1, .log_function = NULL};
-    danp_init(&config);
-
-    /* Register both interfaces */
-    danp_register_interface(&can_interface);
-    danp_register_interface(&uart_interface);
-
-    /* Load routing table */
-    /* Nodes 10-19 via CAN, nodes 20-29 via UART */
-    const char *routes =
-        "10:CAN0,"
-        "11:CAN0,"
-        "20:UART0,"
-        "21:UART0";
-    danp_route_table_load(routes);
-
-    /* Create socket */
-    danp_socket_t *sock = danp_socket(DANP_TYPE_DGRAM);
-    danp_bind(sock, 100);
-
-    /* Send to different nodes (auto-routed) */
-    danp_send_to(sock, "CAN message", 11, 10, 100);    /* Goes via CAN */
-    danp_send_to(sock, "UART message", 12, 20, 100);   /* Goes via UART */
-
-    return 0;
-}
-```
-
-**Features:**
-- Multiple interface registration
-- Static routing table
-- Automatic route selection
-- Per-interface MTU
-
----
-
-### 4. Zero-Copy Large Message Transfer (SFP)
-
-**Purpose:** Demonstrates efficient large message transfer with fragmentation
-
-```c
-#include <danp/danp.h>
-
-int main(void)
-{
-    danp_config_t config = {.local_node = 1, .log_function = NULL};
-    danp_init(&config);
-
-    danp_register_interface(&my_interface);
-
-    /* Create STREAM socket */
-    danp_socket_t *sock = danp_socket(DANP_TYPE_STREAM);
-    danp_connect(sock, 2, 9000);
-
-    /* Send large message (>256 bytes, auto-fragmented) */
-    uint8_t large_data[1024];
-    /* ... fill with data ... */
-
-    int32_t sent = danp_sfp_send(sock, large_data, sizeof(large_data));
-
-    if (sent > 0)
-    {
-        printf("Sent %d bytes (fragmented)\n", sent);
-    }
-
-    danp_close(sock);
-    return 0;
-}
-```
-
-**Receiver:**
-```c
-#include <danp/danp.h>
-
-int main(void)
-{
-    danp_config_t config = {.local_node = 2, .log_function = NULL};
-    danp_init(&config);
-
-    danp_register_interface(&my_interface);
-
-    danp_socket_t *server = danp_socket(DANP_TYPE_STREAM);
-    danp_listen(server, 9000);
-
-    danp_socket_t *client = danp_accept(server, DANP_WAIT_FOREVER);
-
-    /* Receive large message (auto-reassembled) */
-    uint8_t buffer[2048];
-    int32_t received = danp_sfp_recv(client, buffer, sizeof(buffer), DANP_WAIT_FOREVER);
-
-    if (received > 0)
-    {
-        printf("Received %d bytes (reassembled from fragments)\n", received);
+        if (len > 0)
+        {
+            printf("Received %d bytes (reassembled from fragments)\n", received);
+        }
     }
 
     danp_close(client);

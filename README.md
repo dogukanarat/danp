@@ -263,13 +263,13 @@ See [test/README.md](test/README.md) for detailed testing documentation.
 cmake_minimum_required(VERSION 3.14)
 project(MyProject)
 
-# Find DANP library
+# Find the installed library
 find_package(Danp REQUIRED)
 
 # Create your executable
 add_executable(myapp main.c)
 
-# Link against DANP
+# Link against the library
 target_link_libraries(myapp PRIVATE Danp::Danp)
 ```
 

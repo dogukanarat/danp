@@ -8,7 +8,7 @@
 ## Verified Coding Style Rules
 
 ✅ **1. camelCase for functions and variables**
-   - Example: `lorawanSetLogLevel`, `localVariable`
+   - Example: `danpSocket`, `localVariable`
 
 ✅ **2. UPPER_CASE_WITH_UNDERSCORE for defines**
    - Example: `MAX_BUFFER_SIZE`, `DEFAULT_TIMEOUT_MS`
@@ -29,16 +29,18 @@
 
 ✅ **6. Long function signatures - parameters on separate lines**
    ```c
-   status_t lorawanRoutineAbp(
-       int32_t handleId,
-       const lorawanMacCredentials_t *credential,
-       lorawanMacState_t *state,
-       uint32_t _timeout)
+   int32_t danpRecvFrom(
+       danp_socket_t *socket,
+       void *buffer,
+       uint16_t bufferSize,
+       uint16_t *srcNode,
+       uint16_t *srcPort,
+       uint32_t timeoutMs)
    ```
 
 ✅ **7. Short function signatures - single line**
    ```c
-   void lorawanSetLogLevel(logLevel_t logLevel)
+   void danpInit(const danp_config_t *config)
    ```
 
 ## Testing Results
