@@ -37,7 +37,7 @@ if [[ ! "$MODULE_NAME" =~ ^[a-zA-Z][a-zA-Z0-9_]*$ ]]; then
     exit 1
 fi
 
-HEADER_DIR="$PROJECT_ROOT/include/scaffold_project"
+HEADER_DIR="$PROJECT_ROOT/include/danp"
 SOURCE_DIR="$PROJECT_ROOT/src"
 
 HEADER_PATH="$HEADER_DIR/${MODULE_NAME}.h"
@@ -91,7 +91,7 @@ cat > "$SOURCE_PATH" <<EOF
 
 /* Includes */
 
-#include "scaffold_project/${MODULE_NAME}.h"
+#include "danp/${MODULE_NAME}.h"
 
 /* Imports */
 

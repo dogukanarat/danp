@@ -102,9 +102,9 @@ target_compile_options(Danp
         >
 )
 
-target_compile_definitions(ScaffoldProject
+target_compile_definitions(Danp
     PRIVATE
-        SCAFFOLD_PROJECT_EXPORTS
+        DANP_EXPORTS
 )
 
 # ==============================================================================
