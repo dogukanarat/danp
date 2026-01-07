@@ -106,6 +106,11 @@ void danp_init(const danp_config_t *config)
 {
     for (;;)
     {
+        if (!config)
+        {
+            DANP_LOG_ERR("DANP init failed: NULL config");
+            break;
+        }
         memcpy(&danp_config, config, sizeof(danp_config_t));
         danp_socket_init();
         danp_buffer_init();
@@ -119,13 +124,18 @@ void danp_input(danp_interface_t *iface, uint8_t *raw_data, uint16_t len)
 {
     if (len < DANP_HEADER_SIZE)
     {
-        danp_log_message(DANP_LOG_WARN, "Received packet too short, dropping");
+        DANP_LOG_WRN("Received packet too short, dropping");
+        return;
+    }
+    if (len - DANP_HEADER_SIZE > DANP_MAX_PACKET_SIZE)
+    {
+        DANP_LOG_WRN("Received packet exceeds max payload, dropping");
         return;
     }
     danp_packet_t *pkt = danp_buffer_get();
     if (!pkt)
     {
-        danp_log_message(DANP_LOG_ERROR, "No memory for incoming packet, dropping");
+        DANP_LOG_ERR("No memory for incoming packet, dropping");
         return;
     }
     memcpy(&pkt->header_raw, raw_data, 4);
@@ -140,8 +150,7 @@ void danp_input(danp_interface_t *iface, uint8_t *raw_data, uint16_t len)
     uint8_t dst_port, src_port, flags;
     danp_unpack_header(pkt->header_raw, &dst, &src, &dst_port, &src_port, &flags);
 
-    danp_log_message(
-        DANP_LOG_DEBUG,
+    DANP_LOG_DBG(
         "RX [dst]=%u [src]=%u [dPort]=%u [sPort]=%u [flags]=0x%02X [len]=%u, [iface]=%s",
         dst,
         src,
@@ -154,12 +163,12 @@ void danp_input(danp_interface_t *iface, uint8_t *raw_data, uint16_t len)
 
     if (dst == iface->address)
     {
-        danp_log_message(DANP_LOG_VERBOSE, "Packet received for local node");
+        DANP_LOG_VER("Packet received for local node");
         danp_socket_input_handler(pkt);
     }
     else
     {
-        danp_log_message(DANP_LOG_INFO, "Packet not for local node, dropping");
+        DANP_LOG_INF("Packet not for local node, dropping");
         danp_buffer_free(pkt);
     }
 }

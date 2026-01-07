@@ -98,13 +98,13 @@ int32_t danp_send_packet(danp_socket_t *sock, danp_packet_t *pkt)
     {
         if (!sock || !pkt)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid socket or packet");
+            DANP_LOG_ERR("Invalid socket or packet");
             break;
         }
 
         if (sock->type != DANP_TYPE_DGRAM && sock->state != DANP_SOCK_ESTABLISHED)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket not connected");
+            DANP_LOG_ERR("Socket not connected");
             break;
         }
 
@@ -120,7 +120,7 @@ int32_t danp_send_packet(danp_socket_t *sock, danp_packet_t *pkt)
         /* Route and transmit */
         if (danp_route_tx(pkt) < 0)
         {
-            danp_log_message(DANP_LOG_ERROR, "Failed to route packet");
+            DANP_LOG_ERR("Failed to route packet");
             danp_buffer_free(pkt);
             break;
         }
@@ -159,13 +159,13 @@ int32_t danp_send_packet_to(danp_socket_t *sock, danp_packet_t *pkt, uint16_t ds
     {
         if (!sock || !pkt)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid socket or packet");
+            DANP_LOG_ERR("Invalid socket or packet");
             break;
         }
 
         if (sock->type != DANP_TYPE_DGRAM)
         {
-            danp_log_message(DANP_LOG_ERROR, "send_packet_to only valid for DGRAM sockets");
+            DANP_LOG_ERR("send_packet_to only valid for DGRAM sockets");
             danp_buffer_free(pkt);
             break;
         }
@@ -182,7 +182,7 @@ int32_t danp_send_packet_to(danp_socket_t *sock, danp_packet_t *pkt, uint16_t ds
         /* Route and transmit */
         if (danp_route_tx(pkt) < 0)
         {
-            danp_log_message(DANP_LOG_ERROR, "Failed to route packet");
+            DANP_LOG_ERR("Failed to route packet");
             danp_buffer_free(pkt);
             break;
         }
@@ -209,13 +209,13 @@ danp_packet_t *danp_recv_packet(danp_socket_t *sock, uint32_t timeout_ms)
     {
         if (!sock)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid socket");
+            DANP_LOG_ERR("Invalid socket");
             break;
         }
 
         if (!sock->rx_queue)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket not initialized");
+            DANP_LOG_ERR("Socket not initialized");
             break;
         }
 
@@ -227,7 +227,7 @@ danp_packet_t *danp_recv_packet(danp_socket_t *sock, uint32_t timeout_ms)
         }
 
         /* Packet successfully received */
-        danp_log_message(DANP_LOG_VERBOSE, "Received packet (zero-copy) length=%u", pkt->length);
+        DANP_LOG_VER("Received packet (zero-copy) length=%u", pkt->length);
         break;
     }
 
@@ -259,19 +259,19 @@ danp_packet_t *danp_recv_packet_from(
     {
         if (!sock)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid socket");
+            DANP_LOG_ERR("Invalid socket");
             break;
         }
 
         if (sock->type != DANP_TYPE_DGRAM)
         {
-            danp_log_message(DANP_LOG_ERROR, "recv_packet_from only valid for DGRAM sockets");
+            DANP_LOG_ERR("recv_packet_from only valid for DGRAM sockets");
             break;
         }
 
         if (!sock->rx_queue)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket not initialized");
+            DANP_LOG_ERR("Socket not initialized");
             break;
         }
 
@@ -296,7 +296,7 @@ danp_packet_t *danp_recv_packet_from(
         }
 
         /* Packet successfully received */
-        danp_log_message(DANP_LOG_VERBOSE, "Received packet (zero-copy) from node=%u port=%u, length=%u", src, s_port, pkt->length);
+        DANP_LOG_VER("Received packet (zero-copy) from node=%u port=%u, length=%u", src, s_port, pkt->length);
         break;
     }
 
@@ -323,20 +323,20 @@ int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len)
     {
         if (!sock || !data || len == 0)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid parameters");
+            DANP_LOG_ERR("Invalid parameters");
             break;
         }
 
         if (sock->type == DANP_TYPE_DGRAM)
         {
-            danp_log_message(DANP_LOG_ERROR, "SFP requires reliable STREAM sockets (DGRAM is unreliable)");
+            DANP_LOG_ERR("SFP requires reliable STREAM sockets (DGRAM is unreliable)");
             ret = -EINVAL;
             break;
         }
 
         if (sock->state != DANP_SOCK_ESTABLISHED)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket not connected");
+            DANP_LOG_ERR("Socket not connected");
             break;
         }
 
@@ -345,11 +345,11 @@ int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len)
 
         if (total_fragments > DANP_SFP_MAX_FRAGMENTS)
         {
-            danp_log_message(DANP_LOG_ERROR, "Message too large for SFP fragmentation");
+            DANP_LOG_ERR("Message too large for SFP fragmentation");
             break;
         }
 
-        danp_log_message(DANP_LOG_DEBUG, "Fragmenting %u bytes into %u fragments", len, total_fragments);
+        DANP_LOG_DBG("Fragmenting %u bytes into %u fragments", len, total_fragments);
 
         /* Send fragments */
         while (offset < len)
@@ -357,7 +357,7 @@ int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len)
             danp_packet_t *pkt = danp_buffer_get();
             if (!pkt)
             {
-                danp_log_message(DANP_LOG_ERROR, "Failed to allocate packet for fragment");
+                DANP_LOG_ERR("Failed to allocate packet for fragment");
                 ret = -ENOMEM;
                 break;
             }
@@ -390,7 +390,7 @@ int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len)
             /* Route and transmit */
             if (danp_route_tx(pkt) < 0)
             {
-                danp_log_message(DANP_LOG_ERROR, "Failed to route fragment %u", fragment_id);
+                DANP_LOG_ERR("Failed to route fragment %u", fragment_id);
                 danp_buffer_free(pkt);
                 ret = -EIO;
                 break;
@@ -406,7 +406,7 @@ int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len)
         if (bytes_sent == len)
         {
             ret = bytes_sent;
-            danp_log_message(DANP_LOG_DEBUG, "Successfully sent %u bytes in %u fragments", bytes_sent, fragment_id);
+            DANP_LOG_DBG("Successfully sent %u bytes in %u fragments", bytes_sent, fragment_id);
         }
 
         break;
@@ -432,13 +432,13 @@ danp_packet_t *danp_recv_sfp(danp_socket_t *sock, uint32_t timeout_ms)
     {
         if (!sock)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid socket");
+            DANP_LOG_ERR("Invalid socket");
             break;
         }
 
         if (sock->type == DANP_TYPE_DGRAM)
         {
-            danp_log_message(DANP_LOG_ERROR, "SFP requires reliable STREAM sockets (DGRAM is unreliable)");
+            DANP_LOG_ERR("SFP requires reliable STREAM sockets (DGRAM is unreliable)");
             break;
         }
 
@@ -448,8 +448,20 @@ danp_packet_t *danp_recv_sfp(danp_socket_t *sock, uint32_t timeout_ms)
             danp_packet_t *pkt = danp_recv_packet(sock, timeout_ms);
             if (!pkt)
             {
-                danp_log_message(DANP_LOG_WARN, "Timeout waiting for fragment");
+                DANP_LOG_WRN("Timeout waiting for fragment");
                 /* Free any partial chain */
+                if (head)
+                {
+                    danp_buffer_free_chain(head);
+                    head = NULL;
+                }
+                break;
+            }
+
+            if (pkt->length < 1U)
+            {
+                DANP_LOG_ERR("Invalid SFP fragment length");
+                danp_buffer_free(pkt);
                 if (head)
                 {
                     danp_buffer_free_chain(head);
@@ -466,7 +478,7 @@ danp_packet_t *danp_recv_sfp(danp_socket_t *sock, uint32_t timeout_ms)
             /* Validate fragment order */
             if (fragment_id != expected_fragment_id)
             {
-                danp_log_message(DANP_LOG_ERROR, "Fragment out of order: expected %u, got %u", expected_fragment_id, fragment_id);
+                DANP_LOG_ERR("Fragment out of order: expected %u, got %u", expected_fragment_id, fragment_id);
                 danp_buffer_free(pkt);
                 if (head)
                 {
@@ -495,12 +507,12 @@ danp_packet_t *danp_recv_sfp(danp_socket_t *sock, uint32_t timeout_ms)
             pkt->next = NULL;
             expected_fragment_id++;
 
-            danp_log_message(DANP_LOG_VERBOSE, "Received fragment %u (more=%d)", fragment_id, has_more);
+            DANP_LOG_VER("Received fragment %u (more=%d)", fragment_id, has_more);
         }
 
         if (head)
         {
-            danp_log_message(DANP_LOG_DEBUG, "Reassembled message with %u fragments", expected_fragment_id);
+            DANP_LOG_DBG("Reassembled message with %u fragments", expected_fragment_id);
         }
 
         break;

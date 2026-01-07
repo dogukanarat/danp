@@ -56,7 +56,7 @@ static bool danp_route_lock(void)
         if (route_mutex == NULL)
         {
             /* LCOV_EXCL_START */
-            danp_log_message(DANP_LOG_ERROR, "Failed to create routing mutex");
+            DANP_LOG_ERR("Failed to create routing mutex");
             return false;
             /* LCOV_EXCL_STOP */
         }
@@ -169,28 +169,27 @@ static danp_interface_t *danp_route_lookup(uint16_t dest_node_id)
  * @brief Register a network interface.
  * @param iface Pointer to the interface to register.
  */
-void danp_register_interface(void *iface)
+void danp_register_interface(danp_interface_t *iface)
 {
-    danp_interface_t *iface_common = iface;
     bool locked = false;
-    if (!iface_common)
+    if (!iface)
     {
-        danp_log_message(DANP_LOG_ERROR, "Cannot register NULL interface");
+        DANP_LOG_ERR("Cannot register NULL interface");
         return;
     }
-    if (!iface_common->tx_func)
+    if (!iface->tx_func)
     {
-        danp_log_message(DANP_LOG_ERROR, "Interface tx_func is NULL, cannot register");
+        DANP_LOG_ERR("Interface tx_func is NULL, cannot register");
         return;
     }
-    if (!iface_common->name)
+    if (!iface->name)
     {
-        danp_log_message(DANP_LOG_ERROR, "Interface name is NULL, cannot register");
+        DANP_LOG_ERR("Interface name is NULL, cannot register");
         return;
     }
-    if (iface_common->mtu == 0)
+    if (iface->mtu == 0)
     {
-        danp_log_message(DANP_LOG_ERROR, "Interface MTU is zero, cannot register");
+        DANP_LOG_ERR("Interface MTU is zero, cannot register");
         return;
     }
     locked = danp_route_lock();
@@ -203,15 +202,15 @@ void danp_register_interface(void *iface)
 
     if (!iface_list)
     {
-        danp_log_message(DANP_LOG_INFO, "Registering first network interface: %s", iface_common->name);
+        DANP_LOG_INF("Registering first network interface: %s", iface->name);
     }
     else
     {
-        danp_log_message(DANP_LOG_INFO, "Registering network interface: %s", iface_common->name);
+        DANP_LOG_INF("Registering network interface: %s", iface->name);
     }
-    iface_common->next = iface_list;
+    iface->next = iface_list;
     iface_list = iface;
-    danp_log_message(DANP_LOG_VERBOSE, "Registered network interface");
+    DANP_LOG_VER("Registered network interface");
 
     danp_route_unlock(locked);
 }
@@ -233,7 +232,7 @@ int32_t danp_route_table_load(const char *table)
 
     if (!table)
     {
-        danp_log_message(DANP_LOG_ERROR, "Routing table string is NULL");
+        DANP_LOG_ERR("Routing table string is NULL");
         return -1;
     }
 
@@ -256,7 +255,7 @@ int32_t danp_route_table_load(const char *table)
     char *buffer = (char *)malloc(len + 1U);
     if (!buffer)
     {
-        danp_log_message(DANP_LOG_ERROR, "Failed to allocate buffer for routing table");
+        DANP_LOG_ERR("Failed to allocate buffer for routing table");
         danp_route_unlock(locked);
         return -1;
     }
@@ -278,7 +277,7 @@ int32_t danp_route_table_load(const char *table)
         char *separator = strchr(working, ':');
         if (!separator)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid route entry '%s' (missing ':')", working);
+            DANP_LOG_ERR("Invalid route entry '%s' (missing ':')", working);
             route_count = 0U;
             free(buffer);
             danp_route_unlock(locked);
@@ -291,7 +290,7 @@ int32_t danp_route_table_load(const char *table)
 
         if (*dest_str == '\0' || *iface_str == '\0')
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid route entry '%s'", entry);
+            DANP_LOG_ERR("Invalid route entry '%s'", entry);
             route_count = 0U;
             free(buffer);
             danp_route_unlock(locked);
@@ -302,7 +301,7 @@ int32_t danp_route_table_load(const char *table)
         unsigned long dest_val = strtoul(dest_str, &endptr, 0);
         if (*endptr != '\0' || dest_val > UINT16_MAX)
         {
-            danp_log_message(DANP_LOG_ERROR, "Invalid destination node '%s'", dest_str);
+            DANP_LOG_ERR("Invalid destination node '%s'", dest_str);
             route_count = 0U;
             free(buffer);
             danp_route_unlock(locked);
@@ -311,7 +310,7 @@ int32_t danp_route_table_load(const char *table)
 
         if (route_count >= (sizeof(route_table) / sizeof(route_table[0])))
         {
-            danp_log_message(DANP_LOG_ERROR, "Routing table full, cannot add destination %lu", dest_val);
+            DANP_LOG_ERR("Routing table full, cannot add destination %lu", dest_val);
             route_count = 0U;
             free(buffer);
             danp_route_unlock(locked);
@@ -321,7 +320,7 @@ int32_t danp_route_table_load(const char *table)
         danp_interface_t *iface = danp_find_interface_by_name(iface_str);
         if (!iface)
         {
-            danp_log_message(DANP_LOG_ERROR, "Interface '%s' not registered for destination %lu", iface_str, dest_val);
+            DANP_LOG_ERR("Interface '%s' not registered for destination %lu", iface_str, dest_val);
             route_count = 0U;
             free(buffer);
             danp_route_unlock(locked);
@@ -364,7 +363,7 @@ int32_t danp_route_tx(danp_packet_t *pkt)
 {
     if (!pkt)
     {
-        danp_log_message(DANP_LOG_ERROR, "NULL packet passed to router");
+        DANP_LOG_ERR("NULL packet passed to router");
         return -1;
     }
 
@@ -375,18 +374,17 @@ int32_t danp_route_tx(danp_packet_t *pkt)
     danp_interface_t *out = danp_route_lookup(dst);
     if (!out)
     {
-        danp_log_message(DANP_LOG_ERROR, "No route to destination %u", dst);
+        DANP_LOG_ERR("No route to destination %u", dst);
         return -1;
     }
 
     if ((uint32_t)pkt->length + DANP_HEADER_SIZE > out->mtu)
     {
-        danp_log_message(DANP_LOG_ERROR, "Packet length %u exceeds MTU %u for interface %s", pkt->length + DANP_HEADER_SIZE, out->mtu, out->name);
+        DANP_LOG_ERR("Packet length %u exceeds MTU %u for interface %s", pkt->length + DANP_HEADER_SIZE, out->mtu, out->name);
         return -1;
     }
 
-    danp_log_message(
-        DANP_LOG_DEBUG,
+    DANP_LOG_DBG(
         "TX [dst]=%u, [src]=%u, [dPort]=%u, [sPort]=%u, [flags]=0x%02X, [len]=%u, [iface]=%s",
         dst,
         src,
