@@ -42,8 +42,7 @@ static int32_t danp_lo_tx(void *iface_common, danp_packet_t *packet)
     danp_lo_interface_t *lo_iface = (danp_lo_interface_t *)iface_common;
     danp_lo_context_t *ctx = (danp_lo_context_t *)lo_iface->context;
 
-    danp_log_message(
-        DANP_LOG_VERBOSE,
+    DANP_LOG_VER(
         "LO TX: dst=%u port=%u flags=0x%02X len=%u",
         (packet->header_raw >> 22) & 0xFF,
         (packet->header_raw >> 8) & 0x3F,
@@ -53,7 +52,7 @@ static int32_t danp_lo_tx(void *iface_common, danp_packet_t *packet)
     osal_status_t osalStatus = osal_message_queue_send(ctx->mq, packet, OSAL_WAIT_FOREVER);
     if (osalStatus != OSAL_SUCCESS)
     {
-        danp_log_message(DANP_LOG_ERROR, "DANP LO: Failed to enqueue packet for RX");
+        DANP_LOG_ERR("DANP LO: Failed to enqueue packet for RX");
         return -1;
     }
 
@@ -70,8 +69,7 @@ static void danp_lo_rx_routine(void *arg)
         danp_packet_t pkt = {0};
         if (0 == osal_message_queue_receive(ctx->mq, &pkt, DANP_DRIVER_LO_TIMEOUT_MS))
         {
-            danp_log_message(
-                DANP_LOG_VERBOSE,
+            DANP_LOG_VER(
                 "LO RX: dst=%u port=%u flags=0x%02X len=%u",
                 (pkt.header_raw >> 22) & 0xFF,
                 (pkt.header_raw >> 8) & 0x3F,
@@ -125,7 +123,7 @@ int32_t danp_lo_init (danp_lo_interface_t *iface, uint16_t address)
         danp_lo_context.mq = osal_message_queue_create(2, sizeof(danp_packet_t), &mq_attr);
         if (danp_lo_context.mq == NULL)
         {
-            danp_log_message(DANP_LOG_ERROR, "DANP LO: Failed to create message queue");
+            DANP_LOG_ERR("DANP LO: Failed to create message queue");
             ret = -1;
             break;
         }
@@ -136,7 +134,7 @@ int32_t danp_lo_init (danp_lo_interface_t *iface, uint16_t address)
             &thread_attr);
         if (!thread_handle)
         {
-            danp_log_message(DANP_LOG_ERROR, "DANP LO: Failed to create RX thread");
+            DANP_LOG_ERR("DANP LO: Failed to create RX thread");
             ret = -1;
             break;
         }

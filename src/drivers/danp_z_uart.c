@@ -122,8 +122,7 @@ static int32_t danp_uart_tx(void *iface_common, danp_packet_t *packet)
     {
         payload_len = packet->length + sizeof(packet->header_raw);
 
-        danp_log_message(
-            DANP_LOG_VERBOSE,
+        DANP_LOG_VER(
             "UART TX: dst=%u port=%u flags=0x%02X len=%u",
             (packet->header_raw >> 22) & 0xFF,
             (packet->header_raw >> 8) & 0x3F,
@@ -215,8 +214,7 @@ static void danp_uart_rx_routine(void *arg)
                     expected_len |= byte;
                     if (expected_len > sizeof(danp_packet_t) || expected_len < sizeof(uint32_t))
                     {
-                        danp_log_message(
-                            DANP_LOG_WARNING,
+                        DANP_LOG_WRN(
                             "UART RX: Invalid length %u, resync",
                             expected_len);
                         state = DANP_UART_RX_STATE_SYNC;
@@ -254,8 +252,7 @@ static void danp_uart_rx_routine(void *arg)
 
                     if (rx_crc == calc_crc)
                     {
-                        danp_log_message(
-                            DANP_LOG_VERBOSE,
+                        DANP_LOG_VER(
                             "UART RX: len=%u",
                             expected_len);
 
@@ -263,8 +260,7 @@ static void danp_uart_rx_routine(void *arg)
                     }
                     else
                     {
-                        danp_log_message(
-                            DANP_LOG_WARNING,
+                        DANP_LOG_WRN(
                             "UART RX: CRC mismatch (rx=0x%04X, calc=0x%04X)",
                             rx_crc, calc_crc);
                     }
@@ -305,8 +301,7 @@ int32_t danp_z_uart_init(
         if ((NULL == iface) || (NULL == uart_dev))
         {
             ret = -EINVAL;
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Invalid parameters to danp_uart_init");
             break;
         }
@@ -314,8 +309,7 @@ int32_t danp_z_uart_init(
         if (!device_is_ready(uart_dev))
         {
             ret = -ENODEV;
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "UART device not ready");
             break;
         }
@@ -326,8 +320,7 @@ int32_t danp_z_uart_init(
         if (NULL == uart_ctx)
         {
             ret = -ENOMEM;
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Failed to allocate UART context");
             break;
         }
@@ -343,8 +336,7 @@ int32_t danp_z_uart_init(
         ret = k_sem_init(&uart_ctx->rx_sem, 0, K_SEM_MAX_LIMIT);
         if (ret != 0)
         {
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Failed to initialize RX semaphore: %d",
                 ret);
             free(uart_ctx);
@@ -367,16 +359,14 @@ int32_t danp_z_uart_init(
         if (NULL == thread_handle)
         {
             ret = -EAGAIN;
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Failed to create UART RX thread");
             uart_irq_rx_disable(uart_dev);
             free(uart_ctx);
             break;
         }
 
-        danp_log_message(
-            DANP_LOG_INFO,
+        DANP_LOG_INF(
             "DANP UART interface initialized: %s",
             name);
 

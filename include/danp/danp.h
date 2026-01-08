@@ -141,7 +141,7 @@ size_t danp_buffer_get_free_count(void);
  * @brief Register a network interface.
  * @param iface Pointer to the interface to register.
  */
-void danp_register_interface(void *iface);
+void danp_register_interface(danp_interface_t *iface);
 
 // Socket API
 

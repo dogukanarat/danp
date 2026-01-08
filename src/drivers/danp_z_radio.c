@@ -41,8 +41,7 @@ static int32_t danp_radio_tx(void *iface_common, danp_packet_t *packet)
 
     for (;;)
     {
-        danp_log_message(
-            DANP_LOG_VERBOSE,
+        DANP_LOG_VER(
             "Radio TX: dst=%u port=%u flags=0x%02X len=%u",
             (packet->header_raw >> 22) & 0xFF,
             (packet->header_raw >> 8) & 0x3F,
@@ -52,8 +51,7 @@ static int32_t danp_radio_tx(void *iface_common, danp_packet_t *packet)
         ret = radio_ctrl_transmit(radio_ctx->radio_dev, (const uint8_t *)packet, packet->length + sizeof(packet->header_raw));
         if (ret < 0)
         {
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Radio TX failed: %d",
                 ret);
             break;
@@ -62,8 +60,7 @@ static int32_t danp_radio_tx(void *iface_common, danp_packet_t *packet)
         ret = radio_ctrl_listen(radio_ctx->radio_dev, RADIO_CTRL_RX_TIMEOUT_MAX_MS);
         if (ret < 0)
         {
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Radio listen failed: %d",
                 ret);
             break;
@@ -87,8 +84,7 @@ static void danp_radio_rx_routine(void *arg)
         ret = radio_ctrl_receive(radio_ctx->radio_dev, (uint8_t *)&pkt, sizeof(pkt), NULL, DANP_DRIVER_RADIO_TIMEOUT_MS);
         if (ret > 0)
         {
-            danp_log_message(
-                DANP_LOG_VERBOSE,
+            DANP_LOG_VER(
                 "Radio RX: len=%u",
                 ret);
 
@@ -124,8 +120,7 @@ int32_t danp_radio_init (
         if ((NULL == iface) || (NULL == radio_dev))
         {
             ret = -1;
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Invalid parameters to danp_radio_init");
             break;
         }
@@ -136,8 +131,7 @@ int32_t danp_radio_init (
         if (NULL == radio_ctx)
         {
             ret = -1;
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Failed to allocate radio context");
             break;
         }
@@ -153,8 +147,7 @@ int32_t danp_radio_init (
         ret = radio_ctrl_set_config_lora(radio_ctx->radio_dev, rx_params, tx_params, cad_params);
         if (ret < 0)
         {
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Failed to set LoRa config: %d",
                 ret);
             break;
@@ -163,8 +156,7 @@ int32_t danp_radio_init (
         ret = radio_ctrl_listen(radio_ctx->radio_dev, RADIO_CTRL_RX_TIMEOUT_MAX_MS);
         if (ret < 0)
         {
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Radio listen failed: %d",
                 ret);
             break;
@@ -174,8 +166,7 @@ int32_t danp_radio_init (
         if (NULL == thread_handle)
         {
             ret = -1;
-            danp_log_message(
-                DANP_LOG_ERROR,
+            DANP_LOG_ERR(
                 "Failed to create radio RX thread");
             break;
         }

@@ -50,8 +50,7 @@ static int32_t danp_zmq_tx(void *iface_common, danp_packet_t *packet)
     uint8_t d_port = (packet->header_raw >> 8) & 0x3F;
     uint8_t flags = packet->header_raw & 0x03;
 
-    danp_log_message(
-        DANP_LOG_VERBOSE,
+    DANP_LOG_VER(
         "ZMQ TX: dst=%u port=%u flags=0x%02X len=%u",
         dst,
         d_port,
@@ -82,8 +81,7 @@ static void danp_zmq_rx_routine(void *arg)
             uint8_t d_port = (header_raw >> 8) & 0x3F;
             uint8_t flags = header_raw & 0x03;
 
-            danp_log_message(
-                DANP_LOG_VERBOSE,
+            DANP_LOG_VER(
                 "ZMQ RX: [dst]=%u, [port]=%u [flags]=0x%02X [len]=%d",
                 dst,
                 d_port,
@@ -93,7 +91,7 @@ static void danp_zmq_rx_routine(void *arg)
         }
         else
         {
-            danp_log_message(DANP_LOG_WARN, "ZMQ RX: received packet too short");
+            DANP_LOG_WRN("ZMQ RX: received packet too short");
         }
     }
 }
@@ -111,7 +109,7 @@ void danp_zmq_init(
         zmq_context = zmq_ctx_new();
         if (zmq_context == NULL)
         {
-            danp_log_message(DANP_LOG_ERROR, "Failed to create ZMQ context");
+            DANP_LOG_ERR("Failed to create ZMQ context");
             return;
         }
     }

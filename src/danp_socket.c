@@ -125,7 +125,7 @@ static void danp_send_control(danp_socket_t *sock, uint8_t flags, uint8_t seq_nu
     {
         if (!pkt)
         {
-            danp_log_message(DANP_LOG_ERROR, "Failed to allocate control packet");
+            DANP_LOG_ERR("Failed to allocate control packet");
             break;
         }
 
@@ -169,7 +169,7 @@ int32_t danp_socket_init(void)
     mutex_socket = osal_mutex_create(&attr);
     if (!mutex_socket)
     {
-        danp_log_message(DANP_LOG_ERROR, "Failed to create socket mutex");
+        DANP_LOG_ERR("Failed to create socket mutex");
         return -1;
     }
 
@@ -207,7 +207,7 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
         osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
         if (osal_status != OSAL_SUCCESS)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket allocation failed: Mutex Lock Error");
+            DANP_LOG_ERR("Socket allocation failed: Mutex Lock Error");
             break; // Jump to cleanup
         }
         is_mutex_taken = true;
@@ -223,7 +223,7 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
 
         if (slot == NULL)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket allocation failed: No free slots");
+            DANP_LOG_ERR("Socket allocation failed: No free slots");
             break; // Jump to cleanup
         }
 
@@ -272,7 +272,7 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
 
         if (slot->rx_queue == NULL || slot->accept_queue == NULL || slot->signal == NULL)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket allocation failed: OS Resource Error");
+            DANP_LOG_ERR("Socket allocation failed: OS Resource Error");
 
             slot->state = DANP_SOCK_CLOSED;
 
@@ -324,7 +324,7 @@ int32_t danp_bind(danp_socket_t *sock, uint16_t port)
         osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
         if (osal_status != OSAL_SUCCESS)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket bind failed: Mutex Lock Error");
+            DANP_LOG_ERR("Socket bind failed: Mutex Lock Error");
             ret = -1;
             break;
         }
@@ -355,7 +355,7 @@ int32_t danp_bind(danp_socket_t *sock, uint16_t port)
 
             if (port == 0)
             {
-                danp_log_message(DANP_LOG_ERROR, "Socket bind failed: no ephemeral ports available");
+                DANP_LOG_ERR("Socket bind failed: no ephemeral ports available");
                 ret = -1;
                 break;
             }
@@ -369,13 +369,13 @@ int32_t danp_bind(danp_socket_t *sock, uint16_t port)
 
         if (danp_port_in_use(port))
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket bind failed: port %u already in use", port);
+            DANP_LOG_ERR("Socket bind failed: port %u already in use", port);
             ret = -1;
             break;
         }
 
         sock->local_port = port;
-        danp_log_message(DANP_LOG_DEBUG, "Socket bound to port %u", port);
+        DANP_LOG_DBG("Socket bound to port %u", port);
 
         break;
     }
@@ -410,11 +410,13 @@ int32_t danp_close(danp_socket_t *sock)
 {
     osal_status_t osal_status;
     bool is_mutex_taken = false;
+    danp_packet_t *garbage_pkt = NULL;
+    danp_socket_t *garbage_sock = NULL;
 
     osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
     if (osal_status != OSAL_SUCCESS)
     {
-        danp_log_message(DANP_LOG_ERROR, "Socket close failed: Mutex Lock Error");
+        DANP_LOG_ERR("Socket close failed: Mutex Lock Error");
         return -1;
     }
     is_mutex_taken = true;
@@ -453,6 +455,17 @@ int32_t danp_close(danp_socket_t *sock)
     sock->local_port = 0;
 
     // Note: Queue and semaphore are kept alive for quick reuse of the slot.
+    while (osal_message_queue_receive(sock->rx_queue, &garbage_pkt, 0) == 0)
+    {
+        if (garbage_pkt)
+        {
+            danp_buffer_free(garbage_pkt);
+        }
+    }
+    while (osal_message_queue_receive(sock->accept_queue, &garbage_sock, 0) == 0)
+    {
+        /* Drain accept queue */
+    }
 
     if (is_mutex_taken)
     {
@@ -492,8 +505,7 @@ int32_t danp_connect(danp_socket_t *sock, uint16_t node, uint16_t port)
             break;
         }
 
-        danp_log_message(
-            DANP_LOG_INFO,
+        DANP_LOG_INF(
             "Connecting to Node %d Port %d from Local Port %d",
             node,
             port,
@@ -503,12 +515,12 @@ int32_t danp_connect(danp_socket_t *sock, uint16_t node, uint16_t port)
 
         if (0 == osal_semaphore_take(sock->signal, DANP_ACK_TIMEOUT_MS))
         {
-            danp_log_message(DANP_LOG_INFO, "Connection Established");
+            DANP_LOG_INF("Connection Established");
             break;
         }
 
         sock->state = DANP_SOCK_OPEN; // Reset state on timeout
-        danp_log_message(DANP_LOG_WARN, "Connect Timeout");
+        DANP_LOG_WRN("Connect Timeout");
 
         ret = -1;
 
@@ -697,7 +709,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
         osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
         if (osal_status != OSAL_SUCCESS)
         {
-            danp_log_message(DANP_LOG_ERROR, "Socket Input Handler: Mutex Lock Error");
+            DANP_LOG_ERR("Socket Input Handler: Mutex Lock Error");
             break;
         }
         is_mutex_taken = true;
@@ -714,8 +726,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
 
                 if (sock->type == DANP_TYPE_STREAM)
                 {
-                    danp_log_message(
-                        DANP_LOG_INFO,
+                    DANP_LOG_INF(
                         "Received RST from peer. Closing socket to Port %u.",
                         dst_port);
                     sock->state = DANP_SOCK_CLOSED;
@@ -728,7 +739,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
                 else
                 {
                     // For DGRAM, RST is advisory or ignored. We don't close the socket because DGRAM is connectionless.
-                    danp_log_message(DANP_LOG_WARN, "Ignored RST on DGRAM socket Port %u", dst_port);
+                    DANP_LOG_WRN("Ignored RST on DGRAM socket Port %u", dst_port);
                 }
             }
             danp_buffer_free(pkt);
@@ -737,7 +748,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
 
         if (!sock)
         {
-            danp_log_message(DANP_LOG_WARN, "No socket found for Port %u", dst_port);
+            DANP_LOG_WRN("No socket found for Port %u", dst_port);
             danp_buffer_free(pkt);
             break;
         }
@@ -745,7 +756,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
         if ((sock->state == DANP_SOCK_ESTABLISHED || sock->state == DANP_SOCK_SYN_RECEIVED) &&
             (flags & DANP_FLAG_SYN))
         {
-            danp_log_message(DANP_LOG_WARN, "Received SYN on active socket. Peer restart/resync. State reset.");
+            DANP_LOG_WRN("Received SYN on active socket. Peer restart/resync. State reset.");
 
             if (sock->type == DANP_TYPE_STREAM)
             {
@@ -767,7 +778,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
 
         if (sock->state == DANP_SOCK_LISTENING && (flags & DANP_FLAG_SYN))
         {
-            danp_log_message(DANP_LOG_INFO, "Received SYN from Node %d Port %d", src, src_port);
+            DANP_LOG_INF("Received SYN from Node %d Port %d", src, src_port);
 
             child = danp_socket(sock->type);
             if (!child)
@@ -834,7 +845,11 @@ void danp_socket_input_handler(danp_packet_t *pkt)
         {
             if (sock->type == DANP_TYPE_DGRAM)
             {
-                osal_message_queue_send(sock->rx_queue, &pkt, 0);
+                if (0 != osal_message_queue_send(sock->rx_queue, &pkt, 0))
+                {
+                    DANP_LOG_WRN("RX queue full, dropping packet");
+                    danp_buffer_free(pkt);
+                }
                 break;
             }
             else if (sock->type == DANP_TYPE_STREAM)
@@ -844,14 +859,18 @@ void danp_socket_input_handler(danp_packet_t *pkt)
                 if (sock->state == DANP_SOCK_SYN_RECEIVED)
                 {
                     sock->state = DANP_SOCK_ESTABLISHED;
-                    danp_log_message(DANP_LOG_INFO, "Implicitly established connection via Data packet");
+                    DANP_LOG_INF("Implicitly established connection via Data packet");
                 }
 
                 if (seq == sock->rx_expected_seq)
                 {
                     sock->rx_expected_seq++;
                     danp_send_control(sock, DANP_FLAG_ACK, seq);
-                    osal_message_queue_send(sock->rx_queue, &pkt, 0);
+                    if (0 != osal_message_queue_send(sock->rx_queue, &pkt, 0))
+                    {
+                        DANP_LOG_WRN("RX queue full, dropping packet");
+                        danp_buffer_free(pkt);
+                    }
                 }
                 else
                 {
@@ -863,8 +882,8 @@ void danp_socket_input_handler(danp_packet_t *pkt)
             break;
         }
 
-        danp_log_message(DANP_LOG_ERROR, "Unknown message flags/state combination on socket Port %u", dst_port);
-        danp_log_message(DANP_LOG_ERROR, "Packet Flags: 0x%02X, Socket State: %d", flags, sock->state);
+        DANP_LOG_ERR("Unknown message flags/state combination on socket Port %u", dst_port);
+        DANP_LOG_ERR("Packet Flags: 0x%02X, Socket State: %d", flags, sock->state);
 
         danp_buffer_free(pkt);
 

@@ -51,8 +51,8 @@ extern "C" {
 /** @brief Maximum user data per SFP fragment (MTU - Header - SFP header = 128 - 4 - 1 = 123). */
 #define DANP_SFP_MAX_DATA_PER_FRAGMENT (DANP_MAX_PACKET_SIZE - DANP_HEADER_SIZE - 1)
 
-/** @brief Maximum number of fragments per message. */
-#define DANP_SFP_MAX_FRAGMENTS 255
+/** @brief Maximum number of fragments per message (6-bit fragment id). */
+#define DANP_SFP_MAX_FRAGMENTS 64
 
 /** @brief SFP flag: More fragments follow. */
 #define DANP_SFP_FLAG_MORE 0x80

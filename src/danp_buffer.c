@@ -5,6 +5,7 @@
 /* Includes */
 
 #include <errno.h>
+#include <stdint.h>
 
 #include "osal/osal_mutex.h"
 
@@ -57,12 +58,12 @@ int32_t danp_buffer_init(void)
         if (!buffer_mutex)
         {
             /* LCOV_EXCL_START */
-            danp_log_message(DANP_LOG_ERROR, "Failed to create packet pool mutex");
+            DANP_LOG_ERR("Failed to create packet pool mutex");
             status = -ENOMEM;
             /* LCOV_EXCL_STOP */
         }
 
-        danp_log_message(DANP_LOG_INFO, "DANP packet pool initialized");
+        DANP_LOG_INF("DANP packet pool initialized");
 
         break;
     }
@@ -100,11 +101,11 @@ danp_packet_t *danp_buffer_get(void)
         }
         if (!pkt)
         {
-            danp_log_message(DANP_LOG_ERROR, "Packet pool out of memory");
+            DANP_LOG_ERR("Packet pool out of memory");
             break;
         }
 
-        danp_log_message(DANP_LOG_VERBOSE, "Allocated packet from pool");
+        DANP_LOG_VER("Allocated packet from pool");
 
         break;
     }
@@ -125,12 +126,15 @@ void danp_buffer_free(danp_packet_t *pkt)
 {
     bool is_mutex_taken = false;
     int32_t index;
+    const uintptr_t pool_start = (uintptr_t)&packet_pool[0];
+    const uintptr_t pool_end = (uintptr_t)(&packet_pool[DANP_POOL_SIZE]);
+    const uintptr_t pkt_addr = (uintptr_t)pkt;
 
     for (;;)
     {
         if (!pkt)
         {
-            danp_log_message(DANP_LOG_WARN, "Attempted to free NULL packet");
+            DANP_LOG_WRN("Attempted to free NULL packet");
             break;
         }
 
@@ -142,22 +146,28 @@ void danp_buffer_free(danp_packet_t *pkt)
         }
         is_mutex_taken = true;
 
-        index = pkt - packet_pool;
+        if (pkt_addr < pool_start || pkt_addr >= pool_end)
+        {
+            DANP_LOG_ERR("Attempted to free invalid packet");
+            break;
+        }
+
+        index = (int32_t)(pkt - packet_pool);
         if (index < 0 || index >= DANP_POOL_SIZE)
         {
-            danp_log_message(DANP_LOG_ERROR, "Attempted to free invalid packet");
+            DANP_LOG_ERR("Attempted to free invalid packet");
             break;
         }
 
         if (packet_free_map[index])
         {
-            danp_log_message(DANP_LOG_WARN, "Attempted to free already free packet");
+            DANP_LOG_WRN("Attempted to free already free packet");
             break;
         }
 
         packet_free_map[index] = true;
 
-        danp_log_message(DANP_LOG_VERBOSE, "Freed packet back to pool");
+        DANP_LOG_VER("Freed packet back to pool");
 
         break;
     }
