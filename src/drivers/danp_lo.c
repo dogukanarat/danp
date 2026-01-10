@@ -43,22 +43,45 @@ static int32_t danp_lo_tx(void *iface_common, danp_packet_t *packet)
 {
     danp_lo_interface_t *lo_iface = (danp_lo_interface_t *)iface_common;
     danp_lo_context_t *ctx = (danp_lo_context_t *)lo_iface->context;
+    int32_t ret = 0;
 
-    DANP_LOG_VER(
-        "LO TX: dst=%u port=%u flags=0x%02X len=%u",
-        (packet->header_raw >> 22) & 0xFF,
-        (packet->header_raw >> 8) & 0x3F,
-        packet->header_raw & 0x03,
-        packet->length);
-
-    osal_status_t osalStatus = osal_message_queue_send(ctx->mq, packet, OSAL_WAIT_FOREVER);
-    if (osalStatus != OSAL_SUCCESS)
+    for (;;)
     {
-        DANP_LOG_ERR("DANP LO: Failed to enqueue packet for RX");
-        return -1;
+        danp_packet_t *rx_pkt = danp_buffer_get();
+        if (NULL == rx_pkt)
+        {
+            DANP_LOG_ERR("DANP LO TX: Failed to allocate packet buffer");
+            ret = -1;
+            break;
+        }
+
+        rx_pkt->header_raw = packet->header_raw;
+        rx_pkt->length = packet->length;
+        if (packet->length > 0)
+        {
+            memcpy(rx_pkt->payload, packet->payload, packet->length);
+        }
+
+        DANP_LOG_VER(
+            "LO TX: dst=%u port=%u flags=0x%02X len=%u",
+            (rx_pkt->header_raw >> 22) & 0xFF,
+            (rx_pkt->header_raw >> 8) & 0x3F,
+            rx_pkt->header_raw & 0x03,
+            rx_pkt->length);
+
+        osal_status_t osalStatus = osal_message_queue_send(ctx->mq, &rx_pkt, OSAL_WAIT_FOREVER);
+        if (osalStatus != OSAL_SUCCESS)
+        {
+            DANP_LOG_ERR("DANP LO: Failed to enqueue packet for RX");
+            danp_buffer_free(rx_pkt);
+            ret = -1;
+            break;
+        }
+
+        break;
     }
 
-    return 0;
+    return ret;
 }
 
 static void danp_lo_rx_routine(void *arg)
@@ -71,7 +94,7 @@ static void danp_lo_rx_routine(void *arg)
     {
         if (lo_iface->common.data.is_exiting)
         {
-            DANP_LOG_IO_INF("Radio RX: Exiting RX thread");
+            DANP_LOG_IO_INF("Loopback RX: Exiting RX thread");
             break;
         }
 
@@ -81,21 +104,11 @@ static void danp_lo_rx_routine(void *arg)
             continue;
         }
 
-        if (NULL == pkt)
-        {
-            pkt = (danp_packet_t *)danp_buffer_get();
-            if (NULL == pkt)
-            {
-                DANP_LOG_IO_ERR("Radio RX: Failed to allocate packet buffer");
-                osal_delay_ms(1000);
-                continue;
-            }
-        }
-
         if (0 == osal_message_queue_receive(ctx->mq, &pkt, DANP_DRIVER_LO_TIMEOUT_MS))
         {
             DANP_LOG_IO_VER("Loopback RX: Incoming packet: [len]=%u", pkt->length);
             danp_input(&lo_iface->common, pkt);
+            pkt = NULL; // Ownership transferred to danp_input
         }
     }
 }
@@ -141,7 +154,7 @@ int32_t danp_lo_init (danp_lo_interface_t *iface, uint16_t address)
 
         danp_lo_context.iface = iface;
 
-        danp_lo_context.mq = osal_message_queue_create(2, sizeof(danp_packet_t), &mq_attr);
+        danp_lo_context.mq = osal_message_queue_create(2, sizeof(danp_packet_t *), &mq_attr);
         if (danp_lo_context.mq == NULL)
         {
             DANP_LOG_ERR("DANP LO: Failed to create message queue");

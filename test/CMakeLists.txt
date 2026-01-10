@@ -7,195 +7,88 @@ cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 # ==============================================================================
 # Test Options
 # ==============================================================================
-# Option to force using FetchContent even if Unity is installed locally
-option(FORCE_FETCH_UNITY "Force download Unity via FetchContent" OFF)
 
-# Option to enable logging during tests (useful for debugging)
-option(BUILD_TESTS_WITH_LOGS "Enable logging output during tests" OFF)
+option(BUILD_TESTS_WITH_LOGS "Enable logging output during tests" ON)
 
 # ==============================================================================
-# Unity Test Framework Dependency
+# Test Dependencies
 # ==============================================================================
 
-# Try to find Unity framework locally first (if installed on the system)
-# If not found, download it using FetchContent
+find_package(Danp REQUIRED)
+if (NOT Danp_FOUND)
+    message(FATAL_ERROR "Danp library not found. Please install Danp or set Danp_DIR.")
+endif()
 
-# Variable to track if Unity was found
-set(UNITY_FOUND FALSE)
+find_package(Unity REQUIRED)
+if (NOT UNITY_FOUND AND NOT Unity_FOUND)
+    message(STATUS "Unity not found via find_package. Using FetchContent to download Unity.")
+endif()
 
-# Try to find Unity locally first (unless FORCE_FETCH_UNITY is ON)
-if(NOT FORCE_FETCH_UNITY)
-    message(STATUS "Looking for Unity test framework...")
+# ==============================================================================
+# Helper Function to Create Test Executables
+# ==============================================================================
 
-    # Try pkg-config first (most reliable on Linux)
-    find_package(PkgConfig QUIET)
-    if(PKG_CONFIG_FOUND)
-        pkg_check_modules(UNITY QUIET unity)
+function(add_danp_test TEST_NAME TEST_SOURCE)
+    set(_TEST_SOURCES ${TEST_SOURCE})
+
+    if(BUILD_TESTS_WITH_LOGS)
+        list(APPEND _TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/log_message.c)
     endif()
 
-    # If pkg-config didn't find it, try CMake's find_package
-    if(NOT UNITY_FOUND)
-        find_package(Unity QUIET)
+    add_executable(${TEST_NAME} ${_TEST_SOURCES})
+
+    set(_COMPILE_DEFINITIONS_PRIVATE "")
+    if(BUILD_TESTS_WITH_LOGS)
+        list(APPEND _COMPILE_DEFINITIONS_PRIVATE "BUILD_TESTS_WITH_LOGS")
     endif()
 
-    # If still not found, look for Unity in common locations
+    target_compile_definitions(${TEST_NAME}
+        PRIVATE
+            ${_COMPILE_DEFINITIONS_PRIVATE}
+    )
+
+    target_link_libraries(${TEST_NAME}
+        PRIVATE
+            danp
+            unity
+    )
+
     if(NOT UNITY_FOUND AND NOT Unity_FOUND)
-        find_path(UNITY_INCLUDE_DIR
-            NAMES unity.h
-            PATHS
-                /usr/include
-                /usr/local/include
-                /opt/local/include
-                ${CMAKE_PREFIX_PATH}/include
+        target_include_directories(${TEST_NAME}
+            PRIVATE
+                ${unity_SOURCE_DIR}/src
         )
-
-        find_library(UNITY_LIBRARY
-            NAMES unity
-            PATHS
-                /usr/lib
-                /usr/local/lib
-                /opt/local/lib
-                ${CMAKE_PREFIX_PATH}/lib
-        )
-
-        if(UNITY_INCLUDE_DIR AND UNITY_LIBRARY)
-            set(UNITY_FOUND TRUE)
-            message(STATUS "Found Unity: ${UNITY_LIBRARY}")
-        endif()
     endif()
-endif()
 
-# If Unity was found locally, create an imported target
-if(UNITY_FOUND OR Unity_FOUND)
-    if(NOT TARGET unity)
-        add_library(unity INTERFACE IMPORTED)
-
-        # Set include directories
-        if(UNITY_INCLUDE_DIRS)
-            set_target_properties(unity PROPERTIES
-                INTERFACE_INCLUDE_DIRECTORIES "${UNITY_INCLUDE_DIRS}"
-            )
-        elseif(UNITY_INCLUDE_DIR)
-            set_target_properties(unity PROPERTIES
-                INTERFACE_INCLUDE_DIRECTORIES "${UNITY_INCLUDE_DIR}"
-            )
-        endif()
-
-        # Set library path
-        if(UNITY_LIBRARIES)
-            set_target_properties(unity PROPERTIES
-                INTERFACE_LINK_LIBRARIES "${UNITY_LIBRARIES}"
-            )
-        elseif(UNITY_LIBRARY)
-            set_target_properties(unity PROPERTIES
-                INTERFACE_LINK_LIBRARIES "${UNITY_LIBRARY}"
-            )
-        endif()
-
-        message(STATUS "Using locally installed Unity test framework")
-    endif()
-else()
-    # Unity not found locally, download it using FetchContent
-    message(STATUS "Unity not found locally, downloading via FetchContent...")
-
-    include(FetchContent)
-
-    # Declare Unity as a fetchable dependency
-    FetchContent_Declare(
-        unity
-        GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
-        GIT_TAG v2.6.0
-        GIT_SHALLOW TRUE        # Only clone the specific tag (faster)
-        GIT_PROGRESS TRUE       # Show download progress
+    add_test(
+        NAME ${TEST_NAME}
+        COMMAND ${TEST_NAME}
     )
 
-    # Make Unity available (download and configure)
-    FetchContent_MakeAvailable(unity)
-
-    message(STATUS "Unity test framework downloaded successfully")
-endif()
-
-# ==============================================================================
-# Test Executable Definition
-# ==============================================================================
-
-# Create test executable with all test source files
-add_executable(TestDanp)
-
-# Add test source files
-target_sources(TestDanp
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_runner.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_core.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_dgram.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_route.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_stream.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_zerocopy.c
-)
-
-# Conditionally add log_message.c if logging is enabled
-if(BUILD_TESTS_WITH_LOGS)
-    target_sources(TestDanp
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/log_message.c
+    set_tests_properties(${TEST_NAME}
+        PROPERTIES
+            TIMEOUT 30
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            LABELS "unit;danp"
     )
-    # Define preprocessor macro to enable logging in tests
-    target_compile_definitions(TestDanp PRIVATE ENABLE_TEST_LOGGING=1)
-    message(STATUS "Test logging: ENABLED")
-else()
-    message(STATUS "Test logging: DISABLED (use -DBUILD_TESTS_WITH_LOGS=ON to enable)")
-endif()
+endfunction()
 
 # ==============================================================================
-# Test Dependencies and Libraries
+# Test Executable Definitions
 # ==============================================================================
 
-# Link the test executable against the library under test and Unity
-target_link_libraries(TestDanp
-    PRIVATE
-        # The library we're testing (using namespace alias)
-        Danp::Danp
-
-        # Unity test framework
-        unity
-)
-
-# Include Unity headers if we downloaded it via FetchContent
-if(NOT UNITY_FOUND AND NOT Unity_FOUND)
-    target_include_directories(TestDanp
-        PRIVATE
-            ${unity_SOURCE_DIR}/src
-    )
-endif()
-
-# ==============================================================================
-# Test Registration
-# ==============================================================================
-
-# Register the test executable with CTest
-add_test(
-    NAME danp_unit_tests
-    COMMAND TestDanp
-)
-
-# Set test properties
-set_tests_properties(danp_unit_tests
-    PROPERTIES
-        # Maximum time allowed for test execution (seconds)
-        TIMEOUT 30
-
-        # Working directory for test execution
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-
-        # Labels for organizing tests
-        LABELS "unit;danp"
-)
+add_danp_test(test_core ${CMAKE_CURRENT_SOURCE_DIR}/test_core.c)
+add_danp_test(test_dgram ${CMAKE_CURRENT_SOURCE_DIR}/test_dgram.c)
+add_danp_test(test_route ${CMAKE_CURRENT_SOURCE_DIR}/test_route.c)
+add_danp_test(test_stream ${CMAKE_CURRENT_SOURCE_DIR}/test_stream.c)
+add_danp_test(test_zerocopy ${CMAKE_CURRENT_SOURCE_DIR}/test_zerocopy.c)
 
 # ==============================================================================
 # Summary
 # ==============================================================================
 
 message(STATUS "Test suite configured successfully")
+message(STATUS "  Tests: test_core, test_dgram, test_route, test_stream, test_zerocopy")
 if(UNITY_FOUND OR Unity_FOUND)
     message(STATUS "  Unity source: System installation")
 else()

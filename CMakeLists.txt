@@ -162,12 +162,20 @@ set_target_properties(Danp
 set(_DEPS_PUBLIC "")
 set(_DEPS_PRIVATE "")
 
-#Find and link OSAL library
 find_package(Osal REQUIRED)
-if (Osal_FOUND)
+if(OSAL_FOUND)
     list(APPEND _DEPS_PUBLIC osal)
 else()
-    message(FATAL_ERROR "Osal library not found")
+    message(FATAL_ERROR "Osal library not found. Please install Osal or disable its usage.")
+endif()
+
+if (DANP_SUPPORT_ZMQ)
+    find_package(ZeroMQ REQUIRED)
+    if(ZEROMQ_FOUND)
+        list(APPEND _DEPS_PUBLIC zmq)
+    else()
+        message(FATAL_ERROR "ZeroMQ library not found. Please install ZeroMQ or disable DANP_SUPPORT_ZMQ option.")
+    endif()
 endif()
 
 # Link dependencies to the library target
@@ -182,7 +190,7 @@ target_link_libraries(Danp
 # Optional Components
 # ==============================================================================
 
-# Enable testing if BUILD_TESTS is ON
+# Add test subdirectory if BUILD_TESTS is ON
 if(BUILD_TESTS)
     message(STATUS "Building tests enabled")
     enable_testing()

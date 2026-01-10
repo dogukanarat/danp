@@ -12,9 +12,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "unity.h"
+#include "unity/unity.h"
 
 #include "danp/danp.h"
+#include "danp/danp_buffer.h"
 
 /* ============================================================================
  * Test Configuration
@@ -32,15 +33,21 @@ static bool loopback_registered = false;
 static int32_t loopback_tx(void *iface_common, danp_packet_t *packet)
 {
     danp_interface_t *iface = (danp_interface_t *)iface_common;
-    uint8_t buffer[DANP_HEADER_SIZE + DANP_MAX_PACKET_SIZE];
 
-    memcpy(buffer, &packet->header_raw, DANP_HEADER_SIZE);
-    if (packet->length > 0)
+    danp_packet_t *rx_pkt = danp_buffer_get();
+    if (rx_pkt == NULL)
     {
-        memcpy(buffer + DANP_HEADER_SIZE, packet->payload, packet->length);
+        return -1;
     }
 
-    danp_input(iface, buffer, DANP_HEADER_SIZE + packet->length);
+    rx_pkt->header_raw = packet->header_raw;
+    rx_pkt->length = packet->length;
+    if (packet->length > 0)
+    {
+        memcpy(rx_pkt->payload, packet->payload, packet->length);
+    }
+
+    danp_input(iface, rx_pkt);
     return 0;
 }
 
@@ -52,7 +59,7 @@ static void setup_loopback_interface(void)
         loopback_iface.name = "TEST_LOOPBACK_DGRAM";
         loopback_iface.address = TEST_NODE_ID;
         loopback_iface.mtu = 128;
-        loopback_iface.tx_func = loopback_tx;
+        loopback_iface.ops.tx = loopback_tx;
         loopback_iface.next = NULL;
         danp_register_interface(&loopback_iface);
         loopback_registered = true;
@@ -75,7 +82,7 @@ static void setup_loopback_interface(void)
  * The loopback interface simulates a network by feeding packets back
  * to the local node.
  */
-static void setUp_dgram(void)
+void setUp(void)
 {
     /* Initialize DANP core with test node ID */
     danp_config_t config = {.local_node = TEST_NODE_ID};
@@ -87,9 +94,9 @@ static void setUp_dgram(void)
 /**
  * @brief Teardown function called after each test
  */
-static void tearDown_dgram(void)
+void tearDown(void)
 {
-    /* No cleanup needed for current tests */
+    danp_deinit();
 }
 
 /* ============================================================================
@@ -257,35 +264,24 @@ void test_dgram_recv_timeout_returns_error(void)
 }
 
 /* ============================================================================
- * Test Suite Runner
+ * Main Entry Point
  * ============================================================================
  */
 
 /**
- * @brief Run all DGRAM socket tests
+ * @brief Main entry point for DGRAM socket tests
  *
- * This function is called by the main test runner to execute
- * all DGRAM socket tests in sequence
+ * @return 0 if all tests pass, non-zero otherwise
  */
-void run_dgram_tests(void)
+int main(void)
 {
-    setUp_dgram();
+    UNITY_BEGIN();
+
     RUN_TEST(test_dgram_send_recv_same_node);
-    tearDown_dgram();
-
-    setUp_dgram();
     RUN_TEST(test_dgram_multiple_messages);
-    tearDown_dgram();
-
-    setUp_dgram();
     RUN_TEST(test_dgram_socket_creation_and_binding);
-    tearDown_dgram();
-
-    setUp_dgram();
     RUN_TEST(test_dgram_send_to_rejects_large_payload);
-    tearDown_dgram();
-
-    setUp_dgram();
     RUN_TEST(test_dgram_recv_timeout_returns_error);
-    tearDown_dgram();
+
+    return UNITY_END();
 }

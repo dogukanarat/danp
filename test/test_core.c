@@ -11,7 +11,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "unity.h"
+#include "unity/unity.h"
 
 #include "danp/danp.h"
 #include "danp/danp_buffer.h"
@@ -26,7 +26,7 @@ static int32_t core_loopback_tx(void *iface_common, danp_packet_t *packet)
 static danp_interface_t core_loopback_iface = {
     .name = "CORE_LOOPBACK",
     .mtu = 128,
-    .tx_func = core_loopback_tx,
+    .ops = {.tx = core_loopback_tx},
 };
 static bool core_iface_registered = false;
 
@@ -82,7 +82,7 @@ extern void danp_unpack_header(
  *
  * Initializes the DANP library with a default local node address of 1
  */
-static void setUp_core(void)
+void setUp(void)
 {
     danp_config_t cfg = {.local_node = 1};
     danp_init(&cfg);
@@ -91,9 +91,9 @@ static void setUp_core(void)
 /**
  * @brief Teardown function called after each test
  */
-static void tearDown_core(void)
+void tearDown(void)
 {
-    /* No cleanup needed for current tests */
+    danp_deinit();
 }
 
 /* ============================================================================
@@ -280,8 +280,12 @@ void test_danp_input_drops_short_packets(void)
     ensure_core_interface(1);
     TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE, danp_buffer_get_free_count());
 
-    uint8_t frame[2] = {0x00, 0x00};
-    danp_input(&core_loopback_iface, frame, sizeof(frame));
+    danp_packet_t *pkt = danp_buffer_get();
+    TEST_ASSERT_NOT_NULL(pkt);
+    pkt->header_raw = 0;
+    pkt->length = 0;
+
+    danp_input(&core_loopback_iface, pkt);
 
     TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE, danp_buffer_get_free_count());
 }
@@ -289,22 +293,26 @@ void test_danp_input_drops_short_packets(void)
 void test_danp_input_handles_no_memory(void)
 {
     ensure_core_interface(1);
-    danp_packet_t *held[DANP_POOL_SIZE];
+    danp_packet_t *held[DANP_POOL_SIZE - 1];
 
-    for (uint32_t i = 0; i < DANP_POOL_SIZE; i++)
+    for (uint32_t i = 0; i < DANP_POOL_SIZE - 1; i++)
     {
         held[i] = danp_buffer_get();
         TEST_ASSERT_NOT_NULL(held[i]);
     }
 
-    uint8_t frame[4];
-    uint32_t header = danp_pack_header(DANP_PRIORITY_NORMAL, 1, 1, 1, 1, DANP_FLAG_NONE);
-    memcpy(frame, &header, sizeof(header));
-    danp_input(&core_loopback_iface, frame, sizeof(frame));
+    danp_packet_t *pkt = danp_buffer_get();
+    TEST_ASSERT_NOT_NULL(pkt);
+    pkt->header_raw = danp_pack_header(DANP_PRIORITY_NORMAL, 1, 1, 1, 1, DANP_FLAG_NONE);
+    pkt->length = 0;
 
     TEST_ASSERT_NULL(danp_buffer_get());
 
-    for (uint32_t i = 0; i < DANP_POOL_SIZE; i++)
+    danp_input(&core_loopback_iface, pkt);
+
+    TEST_ASSERT_EQUAL_UINT32(1, danp_buffer_get_free_count());
+
+    for (uint32_t i = 0; i < DANP_POOL_SIZE - 1; i++)
     {
         danp_buffer_free(held[i]);
     }
@@ -313,13 +321,15 @@ void test_danp_input_handles_no_memory(void)
 void test_danp_input_drops_packets_for_other_nodes(void)
 {
     ensure_core_interface(1);
-    uint8_t frame[6] = {0};
-    uint32_t header = danp_pack_header(DANP_PRIORITY_NORMAL, 2, 1, 1, 1, DANP_FLAG_NONE);
-    memcpy(frame, &header, sizeof(header));
-    frame[4] = 0xAA;
-    frame[5] = 0xBB;
 
-    danp_input(&core_loopback_iface, frame, sizeof(frame));
+    danp_packet_t *pkt = danp_buffer_get();
+    TEST_ASSERT_NOT_NULL(pkt);
+    pkt->header_raw = danp_pack_header(DANP_PRIORITY_NORMAL, 2, 1, 1, 1, DANP_FLAG_NONE);
+    pkt->payload[0] = 0xAA;
+    pkt->payload[1] = 0xBB;
+    pkt->length = 2;
+
+    danp_input(&core_loopback_iface, pkt);
 
     TEST_ASSERT_EQUAL_UINT32(DANP_POOL_SIZE, danp_buffer_get_free_count());
 }
@@ -376,70 +386,37 @@ void test_danp_print_stats_invokes_callback(void)
 }
 
 /* ============================================================================
- * Test Suite Runner
+ * Main Entry Point
  * ============================================================================
  */
 
 /**
- * @brief Run all core functionality tests
+ * @brief Main entry point for core functionality tests
  *
- * This function is called by the main test runner to execute
- * all core functionality tests in sequence
+ * @return 0 if all tests pass, non-zero otherwise
  */
-void run_core_tests(void)
+int main(void)
 {
-    /* Header packing tests */
-    setUp_core();
-    RUN_TEST(test_header_packing_preserves_values);
-    tearDown_core();
+    UNITY_BEGIN();
 
-    setUp_core();
+    /* Header packing tests */
+    RUN_TEST(test_header_packing_preserves_values);
     RUN_TEST(test_header_packing_handles_edge_cases);
-    tearDown_core();
 
     /* Memory pool tests */
-    setUp_core();
     RUN_TEST(test_memory_pool_allocates_until_exhaustion);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_packet_allocation_returns_different_packets);
-    tearDown_core();
 
     /* Initialization tests */
-    setUp_core();
     RUN_TEST(test_init_sets_local_node);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_danp_input_drops_short_packets);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_danp_input_handles_no_memory);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_danp_input_drops_packets_for_other_nodes);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_buffer_free_handles_invalid_and_double_free);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_buffer_get_free_count_tracks_allocations);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_bind_rejects_invalid_port);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_bind_detects_port_in_use);
-    tearDown_core();
-
-    setUp_core();
     RUN_TEST(test_danp_print_stats_invokes_callback);
-    tearDown_core();
+
+    return UNITY_END();
 }

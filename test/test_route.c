@@ -3,7 +3,7 @@
  * @brief Unit tests for the static routing table logic.
  */
 
-#include "unity.h"
+#include "unity/unity.h"
  
 #include "danp/danp.h"
 
@@ -42,13 +42,13 @@ static void init_test_interfaces(void)
         iface_a.name = "IFACE_A";
         iface_a.address = 1;
         iface_a.mtu = 128;
-        iface_a.tx_func = iface_a_tx;
+        iface_a.ops.tx = iface_a_tx;
         iface_a.next = NULL;
 
         iface_b.name = "IFACE_B";
         iface_b.address = 2;
         iface_b.mtu = 128;
-        iface_b.tx_func = iface_b_tx;
+        iface_b.ops.tx = iface_b_tx;
         iface_b.next = NULL;
 
         danp_register_interface(&iface_a);
@@ -75,7 +75,7 @@ static void prepare_packet(danp_packet_t *pkt, uint16_t dest_node, uint16_t payl
  * ============================================================================
  */
 
-static void setUp_route(void)
+void setUp(void)
 {
     danp_config_t cfg = {.local_node = 1};
     danp_init(&cfg);
@@ -89,9 +89,9 @@ static void setUp_route(void)
     TEST_ASSERT_EQUAL_INT32(0, danp_route_table_load(""));
 }
 
-static void tearDown_route(void)
+void tearDown(void)
 {
-    /* Nothing to clean up between tests */
+    danp_deinit();
 }
 
 /* ============================================================================
@@ -164,13 +164,13 @@ void test_route_register_interface_validates_inputs(void)
 {
     danp_register_interface(NULL);
 
-    danp_interface_t missing_tx = {.name = "BAD_TX", .mtu = 32, .tx_func = NULL};
+    danp_interface_t missing_tx = {.name = "BAD_TX", .mtu = 32, .ops = {.tx = NULL}};
     danp_register_interface(&missing_tx);
 
-    danp_interface_t missing_name = {.name = NULL, .mtu = 32, .tx_func = iface_a_tx};
+    danp_interface_t missing_name = {.name = NULL, .mtu = 32, .ops = {.tx = iface_a_tx}};
     danp_register_interface(&missing_name);
 
-    danp_interface_t zero_mtu = {.name = "ZERO_MTU", .mtu = 0, .tx_func = iface_a_tx};
+    danp_interface_t zero_mtu = {.name = "ZERO_MTU", .mtu = 0, .ops = {.tx = iface_a_tx}};
     danp_register_interface(&zero_mtu);
 }
 
@@ -194,33 +194,25 @@ void test_route_tx_handles_missing_inputs(void)
 }
 
 /* ============================================================================
- * Test Suite Runner
+ * Main Entry Point
  * ============================================================================
  */
 
-void run_route_tests(void)
+/**
+ * @brief Main entry point for route tests
+ *
+ * @return 0 if all tests pass, non-zero otherwise
+ */
+int main(void)
 {
-    setUp_route();
+    UNITY_BEGIN();
+
     RUN_TEST(test_route_table_routes_packets_over_registered_interfaces);
-    tearDown_route();
-
-    setUp_route();
     RUN_TEST(test_route_table_replaces_entries_and_clears_on_error);
-    tearDown_route();
-
-    setUp_route();
     RUN_TEST(test_route_tx_enforces_mtu_limits);
-    tearDown_route();
-
-    setUp_route();
     RUN_TEST(test_route_register_interface_validates_inputs);
-    tearDown_route();
-
-    setUp_route();
     RUN_TEST(test_route_table_load_errors_and_whitespace);
-    tearDown_route();
-
-    setUp_route();
     RUN_TEST(test_route_tx_handles_missing_inputs);
-    tearDown_route();
+
+    return UNITY_END();
 }

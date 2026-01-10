@@ -4,6 +4,9 @@
 
 /* Includes */
 
+#include <errno.h>
+#include <stdio.h>
+
 #include "danp/danp.h"
 #include "danp/danp_buffer.h"
 #include "danp_debug.h"
@@ -80,12 +83,15 @@ void danp_unpack_header(
     *flags = f;
 }
 
-void danp_init(const danp_config_t *config)
+int32_t danp_init(const danp_config_t *config)
 {
+    int32_t status = 0;
+
     for (;;)
     {
         if (!config)
         {
+            status = -EINVAL;
             DANP_LOG_ERR("DANP init failed: NULL config");
             break;
         }
@@ -99,6 +105,12 @@ void danp_init(const danp_config_t *config)
 
         break;
     }
+
+    return status;
+}
+
+void danp_deinit(void)
+{
 
 }
 

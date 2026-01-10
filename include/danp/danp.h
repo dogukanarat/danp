@@ -28,50 +28,45 @@ extern "C"
 
 /* Types */
 
-
-/**
- * @brief Callback function type for logging.
- * @param level Log level.
- * @param func_name Name of the function generating the log.
- * @param message Log message format string.
- * @param args Variable arguments list.
- */
+/// @brief Callback function type for logging.
+/// @param level Log level.
+/// @param func_name Name of the function generating the log.
+/// @param message Log message format string.
+/// @param args Variable arguments list.
 typedef void (*danp_log_function_callback)(
     danp_log_level_t level,
     const char *func_name,
     const char *message,
     va_list args);
 
-/**
- * @brief Configuration structure for DANP initialization.
- */
+/// @brief Configuration structure for DANP initialization.
 typedef struct danp_config_s
 {
-    uint16_t local_node;                          ///< Local node address.
-    danp_log_function_callback log_function;      ///< Logging callback function.
-    danp_log_function_callback log_function_io;   ///< Logging callback function for I/O operations.
+    uint16_t local_node;                        ///< Local node address.
+    danp_log_function_callback log_function;    ///< Logging callback function.
+    danp_log_function_callback log_function_io; ///< Logging callback function for I/O operations.
 } danp_config_t;
 
 /* External Declarations */
 
 // Core functions
 
-/**
- * @brief Initialize the DANP library.
- * @param config Pointer to the configuration structure.
- */
-void danp_init(const danp_config_t *config);
+/// @brief Initialize the DANP library.
+/// @param config Pointer to the configuration structure.
+/// @return status code (0 on success, negative on error).
+int32_t danp_init(const danp_config_t *config);
 
-/**
- * @brief Pack a DANP header.
- * @param priority Packet priority.
- * @param dst_node Destination node address.
- * @param src_node Source node address.
- * @param dst_port Destination port.
- * @param src_port Source port.
- * @param flags Packet flags.
- * @return Packed header as a 32-bit integer.
- */
+/// @brief Deinitialize the DANP library.
+void danp_deinit(void);
+
+/// @brief Pack a DANP header.
+/// @param priority Packet priority.
+/// @param dst_node Destination node address.
+/// @param src_node Source node address.
+/// @param dst_port Destination port.
+/// @param src_port Source port.
+/// @param flags Packet flags.
+/// @return Packed header as a 32-bit integer.
 uint32_t danp_pack_header(
     uint8_t priority,
     uint16_t dst_node,
@@ -104,7 +99,11 @@ void danp_unpack_header(
  * @param message Message format string.
  * @param ... Variable arguments.
  */
-void danp_log_message_handler(danp_log_level_t level, const char *func_name, const char *message, ...);
+void danp_log_message_handler(
+    danp_log_level_t level,
+    const char *func_name,
+    const char *message,
+    ...);
 
 /**
  * @brief Log a message using the registered callback for I/O operations.
@@ -113,7 +112,11 @@ void danp_log_message_handler(danp_log_level_t level, const char *func_name, con
  * @param message Message format string.
  * @param ... Variable arguments.
  */
-void danp_log_message_handler_io(danp_log_level_t level, const char *func_name, const char *message, ...);
+void danp_log_message_handler_io(
+    danp_log_level_t level,
+    const char *func_name,
+    const char *message,
+    ...);
 
 /**
  * @brief Route a packet for transmission.
@@ -237,7 +240,12 @@ int32_t danp_recv(danp_socket_t *sock, void *buffer, uint16_t max_len, uint32_t 
  * @param dst_port Destination port number.
  * @return Number of bytes sent, or negative on error.
  */
-int32_t danp_send_to(danp_socket_t *sock, void *data, uint16_t len, uint16_t dst_node, uint16_t dst_port);
+int32_t danp_send_to(
+    danp_socket_t *sock,
+    void *data,
+    uint16_t len,
+    uint16_t dst_node,
+    uint16_t dst_port);
 
 /**
  * @brief Receive data from any source (for DGRAM sockets).
@@ -273,7 +281,11 @@ int32_t danp_send_packet(danp_socket_t *sock, danp_packet_t *pkt);
  * @param dst_port Destination port number.
  * @return 0 on success, negative on error.
  */
-int32_t danp_send_packet_to(danp_socket_t *sock, danp_packet_t *pkt, uint16_t dst_node, uint16_t dst_port);
+int32_t danp_send_packet_to(
+    danp_socket_t *sock,
+    danp_packet_t *pkt,
+    uint16_t dst_node,
+    uint16_t dst_port);
 
 /**
  * @brief Receive a packet directly without copying (zero-copy RX).

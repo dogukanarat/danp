@@ -13,9 +13,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "unity.h"
+#include "unity/unity.h"
 
 #include "danp/danp.h"
+#include "danp/danp_buffer.h"
 
 /* ============================================================================
  * Test Configuration
@@ -23,13 +24,13 @@
  */
 
 /* Test node and port identifiers */
-#define TEST_NODE_ID 50   /* Local node ID for all tests */
-#define SERVER_PORT 10    /* Default server port */
-#define CLIENT_PORT 11    /* Default client port */
+#define TEST_NODE_ID 50 /* Local node ID for all tests */
+#define SERVER_PORT 10  /* Default server port */
+#define CLIENT_PORT 11  /* Default client port */
 
 #ifdef ENABLE_TEST_LOGGING
 /* External logging function declaration (only when logging is enabled) */
-void danp_log_message_with_func_name(
+extern void danp_log_message_with_func_name(
     danp_log_level_t level,
     const char *func_name,
     const char *message,
@@ -42,15 +43,21 @@ static bool loopback_registered = false;
 static int32_t loopback_tx(void *iface_common, danp_packet_t *packet)
 {
     danp_interface_t *iface = (danp_interface_t *)iface_common;
-    uint8_t buffer[DANP_HEADER_SIZE + DANP_MAX_PACKET_SIZE];
 
-    memcpy(buffer, &packet->header_raw, DANP_HEADER_SIZE);
-    if (packet->length > 0)
+    danp_packet_t *rx_pkt = danp_buffer_get();
+    if (rx_pkt == NULL)
     {
-        memcpy(buffer + DANP_HEADER_SIZE, packet->payload, packet->length);
+        return -1;
     }
 
-    danp_input(iface, buffer, DANP_HEADER_SIZE + packet->length);
+    rx_pkt->header_raw = packet->header_raw;
+    rx_pkt->length = packet->length;
+    if (packet->length > 0)
+    {
+        memcpy(rx_pkt->payload, packet->payload, packet->length);
+    }
+
+    danp_input(iface, rx_pkt);
     return 0;
 }
 
@@ -62,14 +69,15 @@ static void setup_loopback_interface(void)
         loopback_iface.name = "TEST_LOOPBACK_STREAM";
         loopback_iface.address = TEST_NODE_ID;
         loopback_iface.mtu = 128;
-        loopback_iface.tx_func = loopback_tx;
+        loopback_iface.ops.tx = loopback_tx;
         loopback_iface.next = NULL;
         danp_register_interface(&loopback_iface);
         loopback_registered = true;
     }
 
     char route_entry[32];
-    int written = snprintf(route_entry, sizeof(route_entry), "%u:%s", TEST_NODE_ID, loopback_iface.name);
+    int written =
+        snprintf(route_entry, sizeof(route_entry), "%u:%s", TEST_NODE_ID, loopback_iface.name);
     TEST_ASSERT_TRUE(written > 0 && written < (int)sizeof(route_entry));
     TEST_ASSERT_EQUAL_INT32(0, danp_route_table_load(route_entry));
 }
@@ -94,13 +102,19 @@ static void setup_loopback_interface(void)
  * The loopback interface feeds packets back to the local node, enabling
  * synchronous handshake testing.
  */
-static void setUp_stream(void)
+void setUp(void)
 {
     /* Initialize DANP core with test node ID */
 #ifdef ENABLE_TEST_LOGGING
-    danp_config_t config = {.local_node = TEST_NODE_ID, .log_function = danp_log_message_with_func_name};
+    danp_config_t config = {
+        .local_node = TEST_NODE_ID,
+        .log_function = danp_log_message_with_func_name,
+        .log_function_io = danp_log_message_with_func_name};
 #else
-    danp_config_t config = {.local_node = TEST_NODE_ID, .log_function = NULL};
+    danp_config_t config = {
+        .local_node = TEST_NODE_ID,
+        .log_function = NULL,
+        .log_function_io = NULL};
 #endif
     danp_init(&config);
 
@@ -110,9 +124,9 @@ static void setUp_stream(void)
 /**
  * @brief Teardown function called after each test
  */
-static void tearDown_stream(void)
+void tearDown(void)
 {
-    /* No cleanup needed for current tests */
+    danp_deinit();
 }
 
 /* ============================================================================
@@ -284,8 +298,8 @@ void test_stream_bidirectional_communication(void)
 
     /* Step 3: Server receives data from client */
     char server_buffer[32];
-    int32_t server_bytes_received = danp_recv(
-        accepted_socket, server_buffer, 32, DANP_WAIT_FOREVER);
+    int32_t server_bytes_received =
+        danp_recv(accepted_socket, server_buffer, 32, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(10, server_bytes_received);
     server_buffer[server_bytes_received] = '\0';
     TEST_ASSERT_EQUAL_STRING("ClientData", server_buffer);
@@ -297,8 +311,7 @@ void test_stream_bidirectional_communication(void)
 
     /* Step 5: Client receives data from server */
     char client_buffer[32];
-    int32_t client_bytes_received = danp_recv(
-        client_socket, client_buffer, 32, DANP_WAIT_FOREVER);
+    int32_t client_bytes_received = danp_recv(client_socket, client_buffer, 32, DANP_WAIT_FOREVER);
     TEST_ASSERT_EQUAL(10, client_bytes_received);
     client_buffer[client_bytes_received] = '\0';
     TEST_ASSERT_EQUAL_STRING("ServerData", client_buffer);
@@ -322,41 +335,32 @@ void test_stream_accept_timeout_returns_null(void)
 }
 
 /* ============================================================================
- * Test Runner
+ * Main Entry Point
  * ============================================================================
  */
 
 /**
- * @brief Run all STREAM socket tests
+ * @brief Main entry point for STREAM socket tests
  *
- * This function is called by the main test runner to execute
- * all STREAM socket tests in sequence
+ * @return 0 if all tests pass, non-zero otherwise
  */
-void run_stream_tests(void)
+int main(void)
 {
-    /* Run all STREAM socket tests */
+    UNITY_BEGIN();
+
 #if ENABLE_TEST_STREAM_HANDSHAKE
-    setUp_stream();
     RUN_TEST(test_stream_handshake_and_data_transfer);
-    tearDown_stream();
 #endif
 #if ENABLE_TEST_STREAM_CLOSE_RST
-    setUp_stream();
     RUN_TEST(test_stream_close_triggers_rst);
-    tearDown_stream();
 #endif
 #if ENABLE_TEST_STREAM_SOCKET_STATES
-    setUp_stream();
     RUN_TEST(test_stream_socket_creation_and_states);
-    tearDown_stream();
 #endif
 #if ENABLE_TEST_STREAM_BIDIRECTIONAL
-    setUp_stream();
     RUN_TEST(test_stream_bidirectional_communication);
-    tearDown_stream();
-
-    setUp_stream();
     RUN_TEST(test_stream_accept_timeout_returns_null);
-    tearDown_stream();
 #endif
+
+    return UNITY_END();
 }

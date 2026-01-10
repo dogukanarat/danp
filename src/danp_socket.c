@@ -164,6 +164,20 @@ static void danp_send_control(danp_socket_t *sock, uint8_t flags, uint8_t seq_nu
 
 int32_t danp_socket_init(void)
 {
+    // Skip if already initialized
+    if (mutex_socket != NULL)
+    {
+        // Reset socket pool state for re-initialization
+        for (int i = 0; i < DANP_MAX_SOCKET_COUNT; i++)
+        {
+            socket_pool[i].state = DANP_SOCK_CLOSED;
+            socket_pool[i].local_port = 0;
+            socket_pool[i].next = NULL;
+        }
+        socket_list = NULL;
+        return 0;
+    }
+
     osal_mutex_attr_t attr = {
         .name = "danpSocketMutex",
         .attr_bits = OSAL_MUTEX_RECURSIVE,
@@ -181,6 +195,7 @@ int32_t danp_socket_init(void)
     for (int i = 0; i < DANP_MAX_SOCKET_COUNT; i++)
     {
         socket_pool[i].state = DANP_SOCK_CLOSED;
+        socket_pool[i].local_port = 0;
         socket_pool[i].next = NULL;
     }
 
@@ -509,7 +524,7 @@ int32_t danp_close(danp_socket_t *sock)
         osal_mutex_unlock(mutex_socket);
     }
 
-    return 0;
+    return status;
 }
 
 int32_t danp_connect(danp_socket_t *sock, uint16_t node, uint16_t port)

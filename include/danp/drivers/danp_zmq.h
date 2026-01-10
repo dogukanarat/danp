@@ -33,7 +33,7 @@ typedef struct danp_zmq_interface_s
 
 /* External Declarations */
 
-extern void danp_zmq_init(
+extern int32_t danp_zmq_init(
     danp_zmq_interface_t *iface,
     const char *pub_bind_endpoint,
     const char **sub_connect_endpoints,

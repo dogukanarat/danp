@@ -40,30 +40,33 @@ static bool packet_free_map[DANP_POOL_SIZE];
 int32_t danp_buffer_init(void)
 {
     int32_t status = 0;
+
+    // Reset packet pool state
+    for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
+    {
+        packet_free_map[i] = true;
+    }
+
+    // Skip mutex creation if already initialized
+    if (buffer_mutex != NULL)
+    {
+        return 0;
+    }
+
     osal_mutex_attr_t sem_attr = {
         .name = "DanpPoolLock",
-        .attr_bits = OSAL_MUTEX_PRIO_INHERIT,
+        .attr_bits = OSAL_MUTEX_RECURSIVE,
         .cb_mem = NULL,
         .cb_size = 0,
     };
 
-    for (;;)
+    buffer_mutex = osal_mutex_create(&sem_attr);
+    if (!buffer_mutex)
     {
-        for (int32_t i = 0; i < DANP_POOL_SIZE; i++)
-        {
-            packet_free_map[i] = true;
-        }
-
-        buffer_mutex = osal_mutex_create(&sem_attr);
-        if (!buffer_mutex)
-        {
-            /* LCOV_EXCL_START */
-            DANP_LOG_ERR("Failed to create packet pool mutex");
-            status = -ENOMEM;
-            /* LCOV_EXCL_STOP */
-        }
-
-        break;
+        /* LCOV_EXCL_START */
+        DANP_LOG_ERR("Failed to create packet pool mutex");
+        status = -ENOMEM;
+        /* LCOV_EXCL_STOP */
     }
 
     return status;

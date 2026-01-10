@@ -29,6 +29,7 @@ include(CMakeFindDependencyMacro)
 # Example dependency declarations (uncomment and modify as needed):
 # find_dependency(Threads)
 # find_dependency(OpenSSL REQUIRED COMPONENTS SSL Crypto)
+find_dependency(Osal REQUIRED)
 
 # ==============================================================================
 # Component Support
