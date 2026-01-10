@@ -47,8 +47,9 @@ typedef void (*danp_log_function_callback)(
  */
 typedef struct danp_config_s
 {
-    uint16_t local_node;                  /**< Local node address. */
-    danp_log_function_callback log_function; /**< Logging callback function. */
+    uint16_t local_node;                          ///< Local node address.
+    danp_log_function_callback log_function;      ///< Logging callback function.
+    danp_log_function_callback log_function_io;   ///< Logging callback function for I/O operations.
 } danp_config_t;
 
 /* External Declarations */
@@ -106,6 +107,15 @@ void danp_unpack_header(
 void danp_log_message_handler(danp_log_level_t level, const char *func_name, const char *message, ...);
 
 /**
+ * @brief Log a message using the registered callback for I/O operations.
+ * @param level Log level.
+ * @param func_name Name of the function.
+ * @param message Message format string.
+ * @param ... Variable arguments.
+ */
+void danp_log_message_handler_io(danp_log_level_t level, const char *func_name, const char *message, ...);
+
+/**
  * @brief Route a packet for transmission.
  * @param packet Pointer to the packet to route.
  * @return 0 on success, negative on error.
@@ -126,10 +136,9 @@ int32_t danp_route_table_load(const char *table);
 /**
  * @brief Process incoming data from an interface.
  * @param iface Pointer to the interface receiving data.
- * @param data Pointer to the received data.
- * @param length Length of the received data.
+ * @param incoming_pkt Pointer to the incoming packet.
  */
-void danp_input(danp_interface_t *iface, uint8_t *data, uint16_t length);
+void danp_input(danp_interface_t *iface, danp_packet_t *incoming_pkt);
 
 /**
  * @brief Get the number of free packets in the pool.

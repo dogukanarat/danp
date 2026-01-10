@@ -63,8 +63,6 @@ int32_t danp_buffer_init(void)
             /* LCOV_EXCL_STOP */
         }
 
-        DANP_LOG_INF("DANP packet pool initialized");
-
         break;
     }
 
@@ -105,7 +103,11 @@ danp_packet_t *danp_buffer_get(void)
             break;
         }
 
-        DANP_LOG_VER("Allocated packet from pool");
+        DANP_LOG_VER(
+            "Buffer allocated: %p, %d/%d free",
+            pkt,
+            danp_buffer_get_free_count(),
+            DANP_POOL_SIZE);
 
         break;
     }
@@ -167,7 +169,11 @@ void danp_buffer_free(danp_packet_t *pkt)
 
         packet_free_map[index] = true;
 
-        DANP_LOG_VER("Freed packet back to pool");
+        DANP_LOG_VER(
+            "Buffer freed: %p, %d/%d free",
+            pkt,
+            danp_buffer_get_free_count(),
+            DANP_POOL_SIZE);
 
         break;
     }

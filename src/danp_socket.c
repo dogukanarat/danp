@@ -4,23 +4,26 @@
 
 /* Includes */
 
+#include <errno.h>
 #include <stdio.h>
 
 #include "osal/osal_mutex.h"
 #include "osal/osal_time.h"
 
-#include "danp/danp_types.h"
-#include "danp/danp_buffer.h"
 #include "danp/danp.h"
+#include "danp/danp_buffer.h"
+#include "danp/danp_types.h"
 #include "danp_debug.h"
 
 /* Imports */
 
+/// @brief Global DANP configuration.
 extern danp_config_t danp_config;
 
 /* Definitions */
 
-#define DANP_MAX_SOCKET_COUNT              (20)
+/// @brief Maximum number of sockets supported.
+#define DANP_MAX_SOCKET_COUNT (20)
 
 /* Types */
 
@@ -36,9 +39,10 @@ static danp_socket_t *socket_list;
 /** @brief Next available ephemeral port. */
 static uint16_t next_ephemeral_port = 1;
 
-/** @brief Mutex for socket operations. */
+/// @brief Mutex for socket operations.
 static osal_mutex_handle_t mutex_socket;
 
+/// @brief Pool of DANP sockets.
 static danp_socket_t socket_pool[DANP_MAX_SOCKET_COUNT];
 
 static bool danp_port_in_use(uint16_t port)
@@ -64,16 +68,25 @@ static bool danp_port_in_use(uint16_t port)
     return false;
 }
 
+static const char *danp_socket_type_to_string(danp_socket_type_t type)
+{
+    switch (type)
+    {
+        case DANP_TYPE_DGRAM:
+            return "DGRAM";
+        case DANP_TYPE_STREAM:
+            return "STREAM";
+        default:
+            return "UNKNOWN";
+    }
+}
+
 /* Functions */
 
-/**
- * @brief Find a socket matching the given parameters.
- * @param local_port Local port number.
- * @param remote_node Remote node address.
- * @param remote_port Remote port number.
- * @return Pointer to the matching socket, or NULL if not found.
- */
-static danp_socket_t *danp_find_socket(uint16_t local_port, uint16_t remote_node, uint16_t remote_port)
+static danp_socket_t *danp_find_socket(
+    uint16_t local_port,
+    uint16_t remote_node,
+    uint16_t remote_port)
 {
     danp_socket_t *cur = socket_list;
     danp_socket_t *ret = NULL;
@@ -98,7 +111,8 @@ static danp_socket_t *danp_find_socket(uint16_t local_port, uint16_t remote_node
             }
 
             // Priority 2: Wildcard Match (Listening stream or Open/Bound DGRAM socket)
-            if (cur->state == DANP_SOCK_LISTENING || (cur->type == DANP_TYPE_DGRAM && cur->state == DANP_SOCK_OPEN))
+            if (cur->state == DANP_SOCK_LISTENING ||
+                (cur->type == DANP_TYPE_DGRAM && cur->state == DANP_SOCK_OPEN))
             {
                 ret = cur;
                 break;
@@ -111,12 +125,6 @@ static danp_socket_t *danp_find_socket(uint16_t local_port, uint16_t remote_node
     return ret;
 }
 
-/**
- * @brief Send a control packet.
- * @param sock Pointer to the socket.
- * @param flags Control flags to send.
- * @param seq_num Sequence number (for ACK packets).
- */
 static void danp_send_control(danp_socket_t *sock, uint8_t flags, uint8_t seq_num)
 {
     danp_packet_t *pkt = danp_buffer_get();
@@ -154,10 +162,6 @@ static void danp_send_control(danp_socket_t *sock, uint8_t flags, uint8_t seq_nu
     }
 }
 
-/**
- * @brief Initialize the socket subsystem.
- * @return int32_t
- */
 int32_t danp_socket_init(void)
 {
     osal_mutex_attr_t attr = {
@@ -185,11 +189,40 @@ int32_t danp_socket_init(void)
     return 0;
 }
 
-/**
- * @brief Create a new DANP socket.
- * @param type Type of the socket (DGRAM or STREAM).
- * @return Pointer to the created socket, or NULL on failure.
- */
+size_t danp_socket_get_free_count (void)
+{
+    size_t free_count = 0;
+    bool is_mutex_taken = false;
+
+    for (;;)
+    {
+        if (0 != osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER))
+        {
+            /* LCOV_EXCL_START */
+            break;
+            /* LCOV_EXCL_STOP */
+        }
+        is_mutex_taken = true;
+
+        for (int32_t i = 0; i < DANP_MAX_SOCKET_COUNT; i++)
+        {
+            if (socket_pool[i].state == DANP_SOCK_CLOSED && socket_pool[i].local_port == 0)
+            {
+                free_count++;
+            }
+        }
+
+        break;
+    }
+
+    if (is_mutex_taken)
+    {
+        osal_mutex_unlock(mutex_socket);
+    }
+
+    return free_count;
+}
+
 danp_socket_t *danp_socket(danp_socket_type_t type)
 {
     osal_status_t osal_status;
@@ -199,8 +232,8 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
     osal_message_queue_handle_t rx_q = NULL;
     osal_message_queue_handle_t acc_q = NULL;
     osal_semaphore_handle_t sig = NULL;
-    osal_message_queue_attr_t mq_attr = { .name = "danpSockRx", .mq_size = 0 /*...*/ };
-    osal_semaphore_attr_t sem_attr   = { .name = "danpSockSig", .max_count = 1 /*...*/ };
+    osal_message_queue_attr_t mq_attr = {.name = "danpSockRx", .mq_size = 0 /*...*/};
+    osal_semaphore_attr_t sem_attr = {.name = "danpSockSig", .max_count = 1 /*...*/};
 
     for (;;)
     {
@@ -296,6 +329,13 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
 
         created_socket = slot;
 
+        DANP_LOG_INF(
+            "Socket created: %p, type: %s! %d/%d free",
+            slot,
+            danp_socket_type_to_string(slot->type),
+            danp_socket_get_free_count(),
+            DANP_MAX_SOCKET_COUNT);
+
         break;
     }
 
@@ -307,12 +347,6 @@ danp_socket_t *danp_socket(danp_socket_type_t type)
     return created_socket;
 }
 
-/**
- * @brief Bind a socket to a local port.
- * @param sock Pointer to the socket.
- * @param port Local port to bind to.
- * @return 0 on success, negative on error.
- */
 int32_t danp_bind(danp_socket_t *sock, uint16_t port)
 {
     int32_t ret = 0;
@@ -388,12 +422,6 @@ int32_t danp_bind(danp_socket_t *sock, uint16_t port)
     return ret;
 }
 
-/**
- * @brief Listen for incoming connections on a socket.
- * @param sock Pointer to the socket.
- * @param backlog Maximum number of pending connections (currently unused).
- * @return 0 on success, negative on error.
- */
 int danp_listen(danp_socket_t *sock, int backlog)
 {
     UNUSED(backlog);
@@ -401,70 +429,79 @@ int danp_listen(danp_socket_t *sock, int backlog)
     return 0;
 }
 
-/**
- * @brief Close a socket and release resources.
- * @param sock Pointer to the socket to close.
- * @return 0 on success, negative on error.
- */
 int32_t danp_close(danp_socket_t *sock)
 {
+    int32_t status = 0;
     osal_status_t osal_status;
     bool is_mutex_taken = false;
     danp_packet_t *garbage_pkt = NULL;
     danp_socket_t *garbage_sock = NULL;
 
-    osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
-    if (osal_status != OSAL_SUCCESS)
+    for (;;)
     {
-        DANP_LOG_ERR("Socket close failed: Mutex Lock Error");
-        return -1;
-    }
-    is_mutex_taken = true;
-
-    // Only send RST for STREAM sockets or connected DGRAM sockets that are actually in a state where RST makes sense.
-    // For DGRAM, we generally don't send RST on close unless we want to signal the peer to stop sending.
-    // However, standard UDP doesn't do this. Let's restrict RST to STREAM.
-    if (sock->type == DANP_TYPE_STREAM &&
-        (sock->state == DANP_SOCK_ESTABLISHED || sock->state == DANP_SOCK_SYN_SENT ||
-         sock->state == DANP_SOCK_SYN_RECEIVED))
-    {
-        danp_send_control(sock, DANP_FLAG_RST, 0);
-    }
-
-    // Unlink from global socket_list
-    if (socket_list == sock)
-    {
-        socket_list = sock->next;
-    }
-    else
-    {
-        danp_socket_t *prev = socket_list;
-        while (prev && prev->next != sock)
+        osal_status = osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER);
+        if (osal_status != OSAL_SUCCESS)
         {
-            prev = prev->next;
+            DANP_LOG_ERR("Socket close failed: Mutex Lock Error");
+            status = -EAGAIN;
+            break;
         }
-        if (prev && prev->next == sock)
-        {
-            prev->next = sock->next;
-        }
-    }
-    sock->next = NULL;
+        is_mutex_taken = true;
 
-    // Clean up state for slot recycling
-    sock->state = DANP_SOCK_CLOSED;
-    sock->local_port = 0;
-
-    // Note: Queue and semaphore are kept alive for quick reuse of the slot.
-    while (osal_message_queue_receive(sock->rx_queue, &garbage_pkt, 0) == 0)
-    {
-        if (garbage_pkt)
+        // Only send RST for STREAM sockets or connected DGRAM sockets that are actually in a state where RST makes sense.
+        // For DGRAM, we generally don't send RST on close unless we want to signal the peer to stop sending.
+        // However, standard UDP doesn't do this. Let's restrict RST to STREAM.
+        if (sock->type == DANP_TYPE_STREAM &&
+            (sock->state == DANP_SOCK_ESTABLISHED || sock->state == DANP_SOCK_SYN_SENT ||
+             sock->state == DANP_SOCK_SYN_RECEIVED))
         {
-            danp_buffer_free(garbage_pkt);
+            danp_send_control(sock, DANP_FLAG_RST, 0);
         }
-    }
-    while (osal_message_queue_receive(sock->accept_queue, &garbage_sock, 0) == 0)
-    {
-        /* Drain accept queue */
+    
+        // Unlink from global socket_list
+        if (socket_list == sock)
+        {
+            socket_list = sock->next;
+        }
+        else
+        {
+            danp_socket_t *prev = socket_list;
+            while (prev && prev->next != sock)
+            {
+                prev = prev->next;
+            }
+            if (prev && prev->next == sock)
+            {
+                prev->next = sock->next;
+            }
+        }
+        sock->next = NULL;
+    
+        // Clean up state for slot recycling
+        sock->state = DANP_SOCK_CLOSED;
+        sock->local_port = 0;
+    
+        // Note: Queue and semaphore are kept alive for quick reuse of the slot.
+        while (osal_message_queue_receive(sock->rx_queue, &garbage_pkt, 0) == 0)
+        {
+            if (garbage_pkt)
+            {
+                danp_buffer_free(garbage_pkt);
+            }
+        }
+        while (osal_message_queue_receive(sock->accept_queue, &garbage_sock, 0) == 0)
+        {
+            /* Drain accept queue */
+        }
+
+        DANP_LOG_INF(
+            "Socket closed: %p, type: %s! %d/%d free",
+            sock,
+            danp_socket_type_to_string(sock->type),
+            danp_socket_get_free_count(),
+            DANP_MAX_SOCKET_COUNT);
+
+        break;
     }
 
     if (is_mutex_taken)
@@ -475,14 +512,6 @@ int32_t danp_close(danp_socket_t *sock)
     return 0;
 }
 
-
-/**
- * @brief Connect a socket to a remote node and port.
- * @param sock Pointer to the socket.
- * @param node Remote node address.
- * @param port Remote port number.
- * @return 0 on success, negative on error.
- */
 int32_t danp_connect(danp_socket_t *sock, uint16_t node, uint16_t port)
 {
     int32_t ret = 0;
@@ -530,12 +559,6 @@ int32_t danp_connect(danp_socket_t *sock, uint16_t node, uint16_t port)
     return ret;
 }
 
-/**
- * @brief Accept a new connection on a listening socket.
- * @param server_sock Pointer to the listening socket.
- * @param timeout_ms Timeout in milliseconds.
- * @return Pointer to the new connected socket, or NULL on timeout/error.
- */
 danp_socket_t *danp_accept(danp_socket_t *server_sock, uint32_t timeout_ms)
 {
     danp_socket_t *client = NULL;
@@ -553,13 +576,6 @@ danp_socket_t *danp_accept(danp_socket_t *server_sock, uint32_t timeout_ms)
     return client;
 }
 
-/**
- * @brief Send data over a connected socket.
- * @param sock Pointer to the socket.
- * @param data Pointer to the data to send.
- * @param len Length of the data.
- * @return Number of bytes sent, or negative on error.
- */
 int32_t danp_send(danp_socket_t *sock, void *data, uint16_t len)
 {
     int32_t ret = 0;
@@ -644,14 +660,6 @@ int32_t danp_send(danp_socket_t *sock, void *data, uint16_t len)
     return ret;
 }
 
-/**
- * @brief Receive data from a connected socket.
- * @param sock Pointer to the socket.
- * @param buffer Pointer to the buffer to store received data.
- * @param max_len Maximum length of the buffer.
- * @param timeout_ms Timeout in milliseconds.
- * @return Number of bytes received, or negative on error/timeout.
- */
 int32_t danp_recv(danp_socket_t *sock, void *buffer, uint16_t max_len, uint32_t timeout_ms)
 {
     int32_t ret = 0;
@@ -685,10 +693,6 @@ int32_t danp_recv(danp_socket_t *sock, void *buffer, uint16_t max_len, uint32_t 
     return ret;
 }
 
-/**
- * @brief Handle incoming packets for sockets.
- * @param pkt Pointer to the received packet.
- */
 void danp_socket_input_handler(danp_packet_t *pkt)
 {
     uint16_t dst = 0;
@@ -726,9 +730,7 @@ void danp_socket_input_handler(danp_packet_t *pkt)
 
                 if (sock->type == DANP_TYPE_STREAM)
                 {
-                    DANP_LOG_INF(
-                        "Received RST from peer. Closing socket to Port %u.",
-                        dst_port);
+                    DANP_LOG_INF("Received RST from peer. Closing socket to Port %u.", dst_port);
                     sock->state = DANP_SOCK_CLOSED;
                     sock->local_port = 0;
 
@@ -896,16 +898,12 @@ void danp_socket_input_handler(danp_packet_t *pkt)
     }
 }
 
-/**
- * @brief Send data to a specific destination (for DGRAM sockets).
- * @param sock Pointer to the socket.
- * @param data Pointer to the data to send.
- * @param len Length of the data.
- * @param dst_node Destination node address.
- * @param dst_port Destination port number.
- * @return Number of bytes sent, or negative on error.
- */
-int32_t danp_send_to(danp_socket_t *sock, void *data, uint16_t len, uint16_t dst_node, uint16_t dst_port)
+int32_t danp_send_to(
+    danp_socket_t *sock,
+    void *data,
+    uint16_t len,
+    uint16_t dst_node,
+    uint16_t dst_port)
 {
     int32_t ret = 0;
     danp_packet_t *pkt;
@@ -929,7 +927,13 @@ int32_t danp_send_to(danp_socket_t *sock, void *data, uint16_t len, uint16_t dst
             break;
         }
 
-        pkt->header_raw = danp_pack_header(0, dst_node, sock->local_node, dst_port, sock->local_port, DANP_FLAG_NONE);
+        pkt->header_raw = danp_pack_header(
+            0,
+            dst_node,
+            sock->local_node,
+            dst_port,
+            sock->local_port,
+            DANP_FLAG_NONE);
         memcpy(pkt->payload, data, len);
         pkt->length = len;
         danp_route_tx(pkt);
@@ -943,16 +947,6 @@ int32_t danp_send_to(danp_socket_t *sock, void *data, uint16_t len, uint16_t dst
     return ret;
 }
 
-/**
- * @brief Receive data from any source (for DGRAM sockets).
- * @param sock Pointer to the socket.
- * @param buffer Pointer to the buffer to store received data.
- * @param max_len Maximum length of the buffer.
- * @param src_node Pointer to store the source node address.
- * @param src_port Pointer to store the source port number.
- * @param timeout_ms Timeout in milliseconds.
- * @return Number of bytes received, or negative on error/timeout.
- */
 int32_t danp_recv_from(
     danp_socket_t *sock,
     void *buffer,
@@ -1017,7 +1011,9 @@ void danp_print_stats(void (*print_func)(const char *fmt, ...))
     danp_socket_t *cur = socket_list;
     while (cur)
     {
-        print_func("      Socket on Local Port %u - State: %d, Type: %d, Remote Node: %u, Remote Port: %u\n",
+        print_func(
+            "      Socket on Local Port %u - State: %d, Type: %d, Remote Node: %u, Remote Port: "
+            "%u\n",
             cur->local_port,
             cur->state,
             cur->type,
@@ -1030,5 +1026,4 @@ void danp_print_stats(void (*print_func)(const char *fmt, ...))
     print_func("DANP Buffer Stats:\n");
     extern size_t danp_buffer_get_free_count(void);
     print_func("    Free Buffers: %zu\n", danp_buffer_get_free_count());
-
 }

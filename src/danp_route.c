@@ -82,11 +82,6 @@ static void danp_route_unlock(bool is_locked)
 
 /* Functions */
 
-/**
- * @brief Trim leading and trailing whitespace from a string in-place.
- * @param str String to trim.
- * @return Pointer to the trimmed string (may be the original pointer).
- */
 static char *danp_trim(char *str)
 {
     while (str && *str && isspace((unsigned char)*str))
@@ -109,11 +104,6 @@ static char *danp_trim(char *str)
     return str;
 }
 
-/**
- * @brief Find an interface by its name.
- * @param name Name of the interface.
- * @return Pointer to the interface or NULL if not found.
- */
 static danp_interface_t *danp_find_interface_by_name(const char *name)
 {
     danp_interface_t *cur = iface_list;
@@ -135,11 +125,6 @@ static danp_interface_t *danp_find_interface_by_name(const char *name)
     return NULL;
 }
 
-/**
- * @brief Lookup the route for a destination node.
- * @param dest_node_id Destination node ID.
- * @return Pointer to the interface to use, or NULL if no route found.
- */
 static danp_interface_t *danp_route_lookup(uint16_t dest_node_id)
 {
     danp_interface_t *iface = NULL;
@@ -165,10 +150,69 @@ static danp_interface_t *danp_route_lookup(uint16_t dest_node_id)
     return iface;
 }
 
-/**
- * @brief Register a network interface.
- * @param iface Pointer to the interface to register.
- */
+void danp_start_interfaces(void)
+{
+    danp_interface_t *cur = iface_list;
+    bool locked = danp_route_lock();
+
+    if (!locked)
+    {
+        /* LCOV_EXCL_START */
+        return;
+        /* LCOV_EXCL_STOP */
+    }
+
+    while (cur)
+    {
+        cur->data.is_running = true;
+        cur = cur->next;
+    }
+
+    danp_route_unlock(locked);
+}
+
+void danp_stop_interfaces(void)
+{
+    danp_interface_t *cur = iface_list;
+    bool locked = danp_route_lock();
+
+    if (!locked)
+    {
+        /* LCOV_EXCL_START */
+        return;
+        /* LCOV_EXCL_STOP */
+    }
+
+    while (cur)
+    {
+        cur->data.is_running = false;
+        cur = cur->next;
+    }
+
+    danp_route_unlock(locked);
+}
+
+void danp_shutdown_interfaces(void)
+{
+    danp_interface_t *cur = iface_list;
+    bool locked = danp_route_lock();
+
+    if (!locked)
+    {
+        /* LCOV_EXCL_START */
+        return;
+        /* LCOV_EXCL_STOP */
+    }
+
+    while (cur)
+    {
+        cur->data.is_exiting = true;
+        cur = cur->next;
+    }
+
+    danp_route_unlock(locked);
+}
+
 void danp_register_interface(danp_interface_t *iface)
 {
     bool locked = false;
@@ -177,7 +221,7 @@ void danp_register_interface(danp_interface_t *iface)
         DANP_LOG_ERR("Cannot register NULL interface");
         return;
     }
-    if (!iface->tx_func)
+    if (!iface->ops.tx)
     {
         DANP_LOG_ERR("Interface tx_func is NULL, cannot register");
         return;
@@ -215,17 +259,6 @@ void danp_register_interface(danp_interface_t *iface)
     danp_route_unlock(locked);
 }
 
-/**
- * @brief Parse and install a static routing table from a string.
- *
- * The table uses comma or newline separated entries with the format
- * "<destination_node>:<interface_name>". Whitespace around tokens is ignored.
- *
- * Example: "1:if0, 42:backbone\n100:radio".
- *
- * @param table Routing table string.
- * @return 0 on success, negative on error.
- */
 int32_t danp_route_table_load(const char *table)
 {
     bool locked = false;
@@ -354,11 +387,6 @@ int32_t danp_route_table_load(const char *table)
     return 0;
 }
 
-/**
- * @brief Route a packet for transmission.
- * @param pkt Pointer to the packet to route.
- * @return 0 on success, negative on error.
- */
 int32_t danp_route_tx(danp_packet_t *pkt)
 {
     if (!pkt)
@@ -377,6 +405,11 @@ int32_t danp_route_tx(danp_packet_t *pkt)
         DANP_LOG_ERR("No route to destination %u", dst);
         return -1;
     }
+    if (out->ops.tx == NULL)
+    {
+        DANP_LOG_ERR("No TX function for interface %s", out->name);
+        return -1;
+    }
 
     if ((uint32_t)pkt->length + DANP_HEADER_SIZE > out->mtu)
     {
@@ -385,7 +418,7 @@ int32_t danp_route_tx(danp_packet_t *pkt)
     }
 
     DANP_LOG_DBG(
-        "TX [dst]=%u, [src]=%u, [dPort]=%u, [sPort]=%u, [flags]=0x%02X, [len]=%u, [iface]=%s",
+        "Output: [dst]=%u [src]=%u [dPort]=%u [sPort]=%u [flags]=0x%02X [len]=%u [iface]=%s",
         dst,
         src,
         dst_port,
@@ -393,5 +426,6 @@ int32_t danp_route_tx(danp_packet_t *pkt)
         flags,
         pkt->length,
         out->name);
-    return out->tx_func(out, pkt);
+
+    return out->ops.tx(out, pkt);
 }

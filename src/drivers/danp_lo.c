@@ -4,13 +4,15 @@
 
 /* Includes */
 
-#include "osal/osal_thread.h"
-#include "osal/osal_message_queue.h"
-#include "danp/danp.h"
-#include "../danp_debug.h"
-#include "danp/drivers/danp_lo.h"
 #include <assert.h>
 #include <stdio.h>
+#include "osal/osal_thread.h"
+#include "osal/osal_time.h"
+#include "osal/osal_message_queue.h"
+#include "danp/danp.h"
+#include "danp/danp_buffer.h"
+#include "../danp_debug.h"
+#include "danp/drivers/danp_lo.h"
 
 /* Imports */
 
@@ -63,20 +65,37 @@ static void danp_lo_rx_routine(void *arg)
 {
     danp_lo_interface_t *lo_iface = (danp_lo_interface_t *)arg;
     danp_lo_context_t *ctx = (danp_lo_context_t *)lo_iface->context;
+    danp_packet_t *pkt = NULL;
 
     for (;;)
     {
-        danp_packet_t pkt = {0};
+        if (lo_iface->common.data.is_exiting)
+        {
+            DANP_LOG_IO_INF("Radio RX: Exiting RX thread");
+            break;
+        }
+
+        if (false == lo_iface->common.data.is_running)
+        {
+            osal_delay_ms(1000);
+            continue;
+        }
+
+        if (NULL == pkt)
+        {
+            pkt = (danp_packet_t *)danp_buffer_get();
+            if (NULL == pkt)
+            {
+                DANP_LOG_IO_ERR("Radio RX: Failed to allocate packet buffer");
+                osal_delay_ms(1000);
+                continue;
+            }
+        }
+
         if (0 == osal_message_queue_receive(ctx->mq, &pkt, DANP_DRIVER_LO_TIMEOUT_MS))
         {
-            DANP_LOG_VER(
-                "LO RX: dst=%u port=%u flags=0x%02X len=%u",
-                (pkt.header_raw >> 22) & 0xFF,
-                (pkt.header_raw >> 8) & 0x3F,
-                pkt.header_raw & 0x03,
-                pkt.length);
-
-            danp_input(&lo_iface->common, (uint8_t *)&pkt, pkt.length + sizeof(pkt.header_raw));
+            DANP_LOG_IO_VER("Loopback RX: Incoming packet: [len]=%u", pkt->length);
+            danp_input(&lo_iface->common, pkt);
         }
     }
 }
@@ -113,7 +132,9 @@ int32_t danp_lo_init (danp_lo_interface_t *iface, uint16_t address)
 
         memset(iface, 0, sizeof(danp_lo_interface_t));
         iface->common.address = address;
-        iface->common.tx_func = danp_lo_tx;
+        iface->common.ops.tx = danp_lo_tx;
+        iface->common.data.is_exiting = false;
+        iface->common.data.is_running = false;
         iface->common.name = "Loopback";
         iface->common.mtu = DANP_MAX_PACKET_SIZE;
         iface->context = &danp_lo_context;

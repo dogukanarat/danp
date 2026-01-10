@@ -11,6 +11,7 @@
 /* Imports */
 
 extern void danp_socket_input_handler(danp_packet_t *pkt);
+extern void danp_start_interfaces(void);
 
 /* Definitions */
 
@@ -28,16 +29,6 @@ danp_config_t danp_config;
 
 /* Functions */
 
-/**
- * @brief Pack a DANP header.
- * @param prio Packet priority.
- * @param dst Destination node address.
- * @param src Source node address.
- * @param dst_port Destination port.
- * @param src_port Source port.
- * @param flags Packet flags.
- * @return Packed header as a 32-bit integer.
- */
 uint32_t danp_pack_header(
     uint8_t prio,
     uint16_t dst,
@@ -66,15 +57,6 @@ uint32_t danp_pack_header(
     return h;
 }
 
-/**
- * @brief Unpack a DANP header.
- * @param raw Raw 32-bit header.
- * @param dst Pointer to store destination node address.
- * @param src Pointer to store source node address.
- * @param dst_port Pointer to store destination port.
- * @param src_port Pointer to store source port.
- * @param flags Pointer to store packet flags.
- */
 void danp_unpack_header(
     uint32_t raw,
     uint16_t *dst,
@@ -98,10 +80,6 @@ void danp_unpack_header(
     *flags = f;
 }
 
-/**
- * @brief Initialize the DANP library.
- * @param config Pointer to the configuration structure.
- */
 void danp_init(const danp_config_t *config)
 {
     for (;;)
@@ -115,71 +93,55 @@ void danp_init(const danp_config_t *config)
         danp_socket_init();
         danp_buffer_init();
 
+        danp_start_interfaces();
+
+        DANP_LOG_INF("DANP initialized with local node: %u", danp_config.local_node);
+
         break;
     }
 
 }
 
-void danp_input(danp_interface_t *iface, uint8_t *raw_data, uint16_t len)
+void danp_input(danp_interface_t *iface, danp_packet_t *incoming_pkt)
 {
-    if (len < DANP_HEADER_SIZE)
-    {
-        DANP_LOG_WRN("Received packet too short, dropping");
-        return;
-    }
-    if (len - DANP_HEADER_SIZE > DANP_MAX_PACKET_SIZE)
-    {
-        DANP_LOG_WRN("Received packet exceeds max payload, dropping");
-        return;
-    }
-    danp_packet_t *pkt = danp_buffer_get();
-    if (!pkt)
-    {
-        DANP_LOG_ERR("No memory for incoming packet, dropping");
-        return;
-    }
-    memcpy(&pkt->header_raw, raw_data, 4);
-    pkt->length = len - 4;
-    if (pkt->length > 0)
-    {
-        memcpy(pkt->payload, raw_data + 4, pkt->length);
-    }
-    pkt->rx_interface = iface;
+    uint16_t dst;
+    uint16_t src;
+    uint8_t dst_port;
+    uint8_t src_port;
+    uint8_t flags;
 
-    uint16_t dst, src;
-    uint8_t dst_port, src_port, flags;
-    danp_unpack_header(pkt->header_raw, &dst, &src, &dst_port, &src_port, &flags);
-
-    DANP_LOG_DBG(
-        "RX [dst]=%u [src]=%u [dPort]=%u [sPort]=%u [flags]=0x%02X [len]=%u, [iface]=%s",
-        dst,
-        src,
-        dst_port,
-        src_port,
-        flags,
-        pkt->length,
-        iface->name
-    );
-
-    if (dst == iface->address)
+    for (;;)
     {
-        DANP_LOG_VER("Packet received for local node");
-        danp_socket_input_handler(pkt);
+        incoming_pkt->rx_interface = iface;
+    
+        danp_unpack_header(incoming_pkt->header_raw, &dst, &src, &dst_port, &src_port, &flags);
+    
+        DANP_LOG_IO_DBG(
+            "Input: [dst]=%u [src]=%u [dPort]=%u [sPort]=%u [flags]=0x%02X [len]=%u [iface]=%s",
+            dst,
+            src,
+            dst_port,
+            src_port,
+            flags,
+            incoming_pkt->length,
+            iface->name
+        );
+    
+        if (dst != iface->address)
+        {
+            DANP_LOG_IO_INF("Input: Packet not for local node, dropping");
+            danp_buffer_free(incoming_pkt);
+            break;
+        }
+        
+        DANP_LOG_IO_VER("Input: Packet received for local node");
+        danp_socket_input_handler(incoming_pkt);
+
+        break;
     }
-    else
-    {
-        DANP_LOG_INF("Packet not for local node, dropping");
-        danp_buffer_free(pkt);
-    }
+
 }
 
-/**
- * @brief Log a message using the registered callback.
- * @param level Log level.
- * @param func_name Name of the function.
- * @param message Message format string.
- * @param ... Variable arguments.
- */
 void danp_log_message_handler(danp_log_level_t level, const char *func_name, const char *message, ...)
 {
     if (danp_config.log_function)
@@ -187,6 +149,17 @@ void danp_log_message_handler(danp_log_level_t level, const char *func_name, con
         va_list args;
         va_start(args, message);
         danp_config.log_function(level, func_name, message, args);
+        va_end(args);
+    }
+}
+
+void danp_log_message_handler_io(danp_log_level_t level, const char *func_name, const char *message, ...)
+{
+    if (danp_config.log_function_io)
+    {
+        va_list args;
+        va_start(args, message);
+        danp_config.log_function_io(level, func_name, message, args);
         va_end(args);
     }
 }

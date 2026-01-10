@@ -63,27 +63,27 @@ void danp_log_message_with_func_name(
     /* Select color and label based on log level */
     switch (level)
     {
-    case DANP_LOG_VERBOSE:
+    case DANP_LOG_LEVEL_VER:
         level_str = "Verbose";
         color_start = COLOR_CYAN;
         break;
 
-    case DANP_LOG_DEBUG:
+    case DANP_LOG_LEVEL_DBG:
         level_str = "Debug";
         color_start = COLOR_CYAN;
         break;
 
-    case DANP_LOG_INFO:
+    case DANP_LOG_LEVEL_INF:
         level_str = "Info";
         color_start = COLOR_GREEN;
         break;
 
-    case DANP_LOG_WARN:
+    case DANP_LOG_LEVEL_WRN:
         level_str = "Warn";
         color_start = COLOR_YELLOW;
         break;
 
-    case DANP_LOG_ERROR:
+    case DANP_LOG_LEVEL_ERR:
         level_str = "Error";
         color_start = COLOR_RED;
         break;

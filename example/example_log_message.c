@@ -26,7 +26,7 @@
 
 /* Variables */
 
-danp_log_level_t LogSeverity = DANP_LOG_DEBUG;
+danp_log_level_t LogSeverity = DANP_LOG_LEVEL_DBG;
 
 /* Functions */
 
@@ -46,23 +46,23 @@ void danpLogMessageCallback(
     uint32_t sysTimeMs = osal_get_tick_ms();
     switch (level)
     {
-    case DANP_LOG_VERBOSE:
+    case DANP_LOG_LEVEL_VER:
         levelStr = "Verbose";
         colorStart = "\033[37m"; // White
         break;
-    case DANP_LOG_DEBUG:
+    case DANP_LOG_LEVEL_DBG:
         levelStr = "Debug";
         colorStart = "\033[36m"; // Cyan
         break;
-    case DANP_LOG_INFO:
+    case DANP_LOG_LEVEL_INF:
         levelStr = "Info";
         colorStart = "\033[32m"; // Green
         break;
-    case DANP_LOG_WARN:
+    case DANP_LOG_LEVEL_WRN:
         levelStr = "Warn";
         colorStart = "\033[33m"; // Yellow
         break;
-    case DANP_LOG_ERROR:
+    case DANP_LOG_LEVEL_ERR:
         levelStr = "Error";
         colorStart = "\033[31m"; // Red
         break;
