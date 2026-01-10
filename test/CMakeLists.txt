@@ -1,6 +1,7 @@
 # ==============================================================================
 # Test Suite Configuration
 # ==============================================================================
+
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 # ==============================================================================
@@ -15,6 +16,7 @@ option(BUILD_TESTS_WITH_LOGS "Enable logging output during tests" OFF)
 # ==============================================================================
 # Unity Test Framework Dependency
 # ==============================================================================
+
 # Try to find Unity framework locally first (if installed on the system)
 # If not found, download it using FetchContent
 
@@ -116,6 +118,7 @@ endif()
 # ==============================================================================
 # Test Executable Definition
 # ==============================================================================
+
 # Create test executable with all test source files
 add_executable(TestDanp)
 
@@ -146,6 +149,7 @@ endif()
 # ==============================================================================
 # Test Dependencies and Libraries
 # ==============================================================================
+
 # Link the test executable against the library under test and Unity
 target_link_libraries(TestDanp
     PRIVATE
@@ -167,6 +171,7 @@ endif()
 # ==============================================================================
 # Test Registration
 # ==============================================================================
+
 # Register the test executable with CTest
 add_test(
     NAME danp_unit_tests
@@ -189,6 +194,7 @@ set_tests_properties(danp_unit_tests
 # ==============================================================================
 # Summary
 # ==============================================================================
+
 message(STATUS "Test suite configured successfully")
 if(UNITY_FOUND OR Unity_FOUND)
     message(STATUS "  Unity source: System installation")

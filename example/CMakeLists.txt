@@ -19,10 +19,15 @@ function(danp_add_example EXAMPLE_NAME)
         example_log_message.c
     )
 
+    set(_DEPS_PUBLIC "")
+    set(_DEPS_PRIVATE "")
+
+    list(APPEND _DEPS_PRIVATE danp)
+
     # Link against library
     target_link_libraries(${EXAMPLE_NAME}
-        PRIVATE
-            danp::danp
+        PRIVATE ${_DEPS_PRIVATE}
+        PUBLIC ${_DEPS_PUBLIC}
     )
 
     # Set output name
@@ -34,18 +39,21 @@ endfunction()
 # ============================================================================
 # DGRAM Examples
 # ============================================================================
+
 danp_add_example(danp_dgram_client SOURCE dgram/client.c)
 danp_add_example(danp_dgram_server SOURCE dgram/server.c)
 
 # ============================================================================
 # STREAM Examples
 # ============================================================================
+
 danp_add_example(danp_stream_client SOURCE stream/client.c)
 danp_add_example(danp_stream_server SOURCE stream/server.c)
 
 # ============================================================================
 # Zero-Copy Examples
 # ============================================================================
+
 danp_add_example(danp_zerocopy_client SOURCE zerocopy/client.c)
 danp_add_example(danp_zerocopy_server SOURCE zerocopy/server.c)
 danp_add_example(danp_sfp_example SOURCE zerocopy/sfp_example.c)
@@ -53,6 +61,7 @@ danp_add_example(danp_sfp_example SOURCE zerocopy/sfp_example.c)
 # ============================================================================
 # Example Summary
 # ============================================================================
+
 message(STATUS "Example applications configured:")
 message(STATUS "  DGRAM:")
 message(STATUS "    - danp_dgram_client")

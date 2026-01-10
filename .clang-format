@@ -1,4 +1,4 @@
-# .clang-format for ScaffoldProject
+# .clang-format for DANP
 # Based on LLVM style with custom modifications
 
 BasedOnStyle: LLVM

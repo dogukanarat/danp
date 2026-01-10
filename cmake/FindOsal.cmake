@@ -1,33 +1,47 @@
-# FindOsal.cmake - Locate the OSAL library
-# This module defines the following variables:
-#   OSAL_FOUND        - True if OSAL is found
-#   OSAL_INCLUDE_DIRS - Include directories for OSAL
-#   OSAL_LIBRARIES    - Libraries to link against OSAL
+# ==============================================================================
+# FindOsal.cmake
+# ==============================================================================
 
-find_path(OSAL_INCLUDE_DIR
+# 1. Use PkgConfig as a hint (if available)
+find_package(PkgConfig QUIET)
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_OSAL QUIET osal)
+endif()
+
+# 2. Find the header file
+find_path(Osal_INCLUDE_DIR
     NAMES osal/osal_thread.h
-    PATHS ${CMAKE_INSTALL_PREFIX}/include /usr/include
+    HINTS 
+        ${PC_OSAL_INCLUDE_DIRS} 
+        ${Osal_ROOT} 
+        ${OSAL_DIR}
+    PATH_SUFFIXES include
 )
 
-find_library(OSAL_LIBRARY
+# 3. Find the library file
+find_library(Osal_LIBRARY
     NAMES osal
-    PATHS ${CMAKE_INSTALL_PREFIX}/lib /usr/lib
+    HINTS 
+        ${PC_OSAL_LIBRARY_DIRS} 
+        ${Osal_ROOT} 
+        ${OSAL_DIR}
+    PATH_SUFFIXES lib bin
 )
 
+# 4. Handle REQUIRED and versioning
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Osal
-    REQUIRED_VARS OSAL_INCLUDE_DIR OSAL_LIBRARY
-    FAIL_MESSAGE "Could not find OSAL library"
+    REQUIRED_VARS Osal_LIBRARY Osal_INCLUDE_DIR
 )
 
-if(OSAL_FOUND)
-    set(OSAL_INCLUDE_DIRS ${OSAL_INCLUDE_DIR})
-    set(OSAL_LIBRARIES ${OSAL_LIBRARY})
-
-    # Create an imported target for OSAL
+# 5. Create the IMPORTED target
+if(Osal_FOUND AND NOT TARGET osal::osal)
     add_library(osal::osal UNKNOWN IMPORTED)
     set_target_properties(osal::osal PROPERTIES
-        IMPORTED_LOCATION ${OSAL_LIBRARY}
-        INTERFACE_INCLUDE_DIRECTORIES ${OSAL_INCLUDE_DIRS}
+        IMPORTED_LOCATION "${Osal_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${Osal_INCLUDE_DIR}"
     )
 endif()
+
+# Hide internal variables from the CMake cache
+mark_as_advanced(Osal_INCLUDE_DIR Osal_LIBRARY)

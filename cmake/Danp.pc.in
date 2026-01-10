@@ -1,5 +1,5 @@
-# pkg-config file for ScaffoldProject
-# This file allows other projects to discover ScaffoldProject using pkg-config
+# pkg-config file for Danp
+# This file allows other projects to discover Danp using pkg-config
 
 prefix=@CMAKE_INSTALL_PREFIX@
 exec_prefix=${prefix}
@@ -9,12 +9,12 @@ includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 Name: @PROJECT_NAME@
 Description: @PROJECT_DESCRIPTION@
 Version: @PROJECT_VERSION@
-URL: https://github.com/dogukanarat/libscaffoldproject
+URL: https://github.com/dogukanarat/danp
 
 # Libraries to link against
-# Add any additional libraries required by ScaffoldProject here
-# Example: Libs: -L${libdir} -lScaffoldProject -lm -lpthread
-Libs: -L${libdir} -lScaffoldProject
+# Add any additional libraries required by Danp here
+# Example: Libs: -L${libdir} -lDanp -lm -lpthread
+Libs: -L${libdir} -lDanp
 
 # Private libraries only needed when linking statically
 # Example: Libs.private: -lm -lpthread
