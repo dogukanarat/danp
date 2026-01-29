@@ -82,5 +82,5 @@ jobs:
         with:
           name: danp-${{ matrix.compiler }}-${{ matrix.library_type }}
           path: |
-            build/danp.*
-            build/test/danp
+            build/libdanp.*
+            build/test/DanpUnitTest

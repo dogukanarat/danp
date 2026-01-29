@@ -1,96 +1,59 @@
 # ==============================================================================
-# Test Suite Configuration
+# Dependency: Unity Test Framework
 # ==============================================================================
 
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+# 1. Try to find Unity on the system
+find_package(unity CONFIG QUIET)
+find_package(PkgConfig QUIET)
 
-# ==============================================================================
-# Test Options
-# ==============================================================================
-
-option(BUILD_TESTS_WITH_LOGS "Enable logging output during tests" ON)
-
-# ==============================================================================
-# Test Dependencies
-# ==============================================================================
-
-find_package(Danp REQUIRED)
-if (NOT Danp_FOUND)
-    message(FATAL_ERROR "Danp library not found. Please install Danp or set Danp_DIR.")
+# 2. Identify the correct target name (System vs PkgConfig)
+if(TARGET unity::framework)          # Your specific system target
+    set(UNITY_TARGET unity::framework)
+elseif(TARGET unity::unity)          # Common alternative
+    set(UNITY_TARGET unity::unity)
+elseif(TARGET unity)                 # Common alternative
+    set(UNITY_TARGET unity)
+elseif(PKG_CONFIG_FOUND)             # Pkg-Config fallback
+    pkg_check_modules(UnityPkg QUIET IMPORTED_TARGET unity)
+    if(UnityPkg_FOUND)
+        set(UNITY_TARGET PkgConfig::UnityPkg)
+    endif()
 endif()
 
-find_package(Unity REQUIRED)
-if (NOT UNITY_FOUND AND NOT Unity_FOUND)
-    message(STATUS "Unity not found via find_package. Using FetchContent to download Unity.")
+# 3. Fallback: Download from GitHub if no system target was found
+if(NOT UNITY_TARGET)
+    message(STATUS "Unity not found on system. Fetching from GitHub...")
+    include(FetchContent)
+    FetchContent_Declare(
+        Unity
+        GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
+        GIT_TAG        v2.6.0
+    )
+    FetchContent_MakeAvailable(Unity)
+    set(UNITY_TARGET unity)
+endif()
+
+if(NOT TARGET Unity::unity)
+    add_library(Unity::unity ALIAS ${UNITY_TARGET})
 endif()
 
 # ==============================================================================
-# Helper Function to Create Test Executables
+# Test Executable
 # ==============================================================================
 
-function(add_danp_test TEST_NAME TEST_SOURCE)
-    set(_TEST_SOURCES ${TEST_SOURCE})
+set(TEST_NAME ${PROJECT_NAME}UnitTest)
 
-    if(BUILD_TESTS_WITH_LOGS)
-        list(APPEND _TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/log_message.c)
-    endif()
+add_executable(${TEST_NAME} 
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_danp.c
+)
 
-    add_executable(${TEST_NAME} ${_TEST_SOURCES})
+target_link_libraries(${TEST_NAME}
+    PRIVATE
+        ${PROJECT_NAME}::${PROJECT_NAME}
+        Unity::unity 
+)
 
-    set(_COMPILE_DEFINITIONS_PRIVATE "")
-    if(BUILD_TESTS_WITH_LOGS)
-        list(APPEND _COMPILE_DEFINITIONS_PRIVATE "BUILD_TESTS_WITH_LOGS")
-    endif()
-
-    target_compile_definitions(${TEST_NAME}
-        PRIVATE
-            ${_COMPILE_DEFINITIONS_PRIVATE}
-    )
-
-    target_link_libraries(${TEST_NAME}
-        PRIVATE
-            danp
-            unity
-    )
-
-    if(NOT UNITY_FOUND AND NOT Unity_FOUND)
-        target_include_directories(${TEST_NAME}
-            PRIVATE
-                ${unity_SOURCE_DIR}/src
-        )
-    endif()
-
-    add_test(
-        NAME ${TEST_NAME}
-        COMMAND ${TEST_NAME}
-    )
-
-    set_tests_properties(${TEST_NAME}
-        PROPERTIES
-            TIMEOUT 30
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            LABELS "unit;danp"
-    )
-endfunction()
-
-# ==============================================================================
-# Test Executable Definitions
-# ==============================================================================
-
-add_danp_test(test_core ${CMAKE_CURRENT_SOURCE_DIR}/test_core.c)
-add_danp_test(test_dgram ${CMAKE_CURRENT_SOURCE_DIR}/test_dgram.c)
-add_danp_test(test_route ${CMAKE_CURRENT_SOURCE_DIR}/test_route.c)
-add_danp_test(test_stream ${CMAKE_CURRENT_SOURCE_DIR}/test_stream.c)
-add_danp_test(test_zerocopy ${CMAKE_CURRENT_SOURCE_DIR}/test_zerocopy.c)
-
-# ==============================================================================
-# Summary
-# ==============================================================================
-
-message(STATUS "Test suite configured successfully")
-message(STATUS "  Tests: test_core, test_dgram, test_route, test_stream, test_zerocopy")
-if(UNITY_FOUND OR Unity_FOUND)
-    message(STATUS "  Unity source: System installation")
-else()
-    message(STATUS "  Unity source: FetchContent (downloaded)")
-endif()
+add_test(
+    NAME ${TEST_NAME}
+    COMMAND ${TEST_NAME}
+)

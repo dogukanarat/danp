@@ -65,7 +65,7 @@ Performs an optimized release build of the DANP library.
 - CI/CD release pipelines
 
 **Output:**
-- Optimized library: `build/libDanp.a`
+- Optimized library: `build/libdanp.a`
 - No debug symbols (smaller binary size)
 - Maximum compiler optimizations enabled
 

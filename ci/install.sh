@@ -212,6 +212,6 @@ elif [ "$INSTALL_PREFIX" != "/usr/local" ] && [ "$INSTALL_PREFIX" != "/usr" ]; t
 fi
 
 print_info "To use in your CMakeLists.txt:"
-echo "  find_package(danp REQUIRED)"
-echo "  target_link_libraries(your_target PRIVATE danp::danp)"
+echo "  find_package(Danp REQUIRED)"
+echo "  target_link_libraries(your_target PRIVATE Danp::Danp)"
 echo ""

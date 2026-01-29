@@ -17,16 +17,9 @@ set(Danp_VERSION_PATCH "@PROJECT_VERSION_PATCH@")
 # ==============================================================================
 # Dependencies
 # ==============================================================================
-# Find and configure any dependencies that scaffold_project requires
-# Add dependencies here as needed, for example:
-# find_dependency(SomePackage REQUIRED)
-
 include(CMakeFindDependencyMacro)
 
-# Note: Standard C library dependencies (like math library) are handled
-# automatically by CMake and don't need to be listed here
-
-# Example dependency declarations (uncomment and modify as needed):
+# List dependencies here. Example:
 # find_dependency(Threads)
 # find_dependency(OpenSSL REQUIRED COMPONENTS SSL Crypto)
 find_dependency(Osal REQUIRED)
@@ -61,7 +54,7 @@ if(NOT TARGET Danp::Danp)
 endif()
 
 # ==============================================================================
-# Package Variables
+# Package Variables (Legacy Support)
 # ==============================================================================
 # Set convenience variables for downstream projects
 set(Danp_LIBRARIES Danp::Danp)

@@ -1,0 +1,24 @@
+/* config.h.in - one line definition */
+
+/* All Rights Reserved */
+
+#ifndef INC_DANP_CONFIG_H
+#define INC_DANP_CONFIG_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#cmakedefine01 BUILD_SHARED_LIBS
+
+#if BUILD_SHARED_LIBS
+    #define DANP_SHARED
+#else
+    #define DANP_STATIC
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* INC_DANP_CONFIG_H */

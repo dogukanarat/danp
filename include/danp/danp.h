@@ -11,9 +11,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "danp/danp_types.h"
+#include "danp/config.h"
 
 #ifdef __cplusplus
 extern "C"

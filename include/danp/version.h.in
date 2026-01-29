@@ -1,0 +1,23 @@
+/* version.h.in - one line definition */
+
+/* All Rights Reserved */
+
+#ifndef INC_DANP_VERSION_H
+#define INC_DANP_VERSION_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define DANP_VERSION_MAJOR @Danp_VERSION_MAJOR@
+#define DANP_VERSION_MINOR @Danp_VERSION_MINOR@
+#define DANP_VERSION_PATCH @Danp_VERSION_PATCH@
+#define DANP_VERSION_STRING "@Danp_VERSION@"
+
+#define DANP_VERSION_GIT "@GIT_VERSION@"
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* INC_DANP_VERSION_H */
