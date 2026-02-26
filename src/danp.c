@@ -10,6 +10,7 @@
 #include "danp/danp.h"
 #include "danp/danp_buffer.h"
 #include "danp_debug.h"
+#include "danp_internal_types.h"
 
 /* Imports */
 
@@ -97,6 +98,7 @@ int32_t danp_init(const danp_config_t *config)
         }
         memcpy(&danp_config, config, sizeof(danp_config_t));
         danp_socket_init();
+        danp_route_init();
         danp_buffer_init();
 
         danp_start_interfaces();

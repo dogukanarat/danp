@@ -11,6 +11,7 @@
 
 #include "danp/danp.h"
 #include "danp_debug.h"
+#include "danp_internal_types.h"
 
 /* Imports */
 

@@ -22,7 +22,7 @@ function(danp_add_example EXAMPLE_NAME)
     set(_DEPS_PUBLIC "")
     set(_DEPS_PRIVATE "")
 
-    list(APPEND _DEPS_PRIVATE danp)
+    list(APPEND _DEPS_PRIVATE danp Osal::Osal)
 
     # Link against library
     target_link_libraries(${EXAMPLE_NAME}

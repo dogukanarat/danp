@@ -6,12 +6,14 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 #include "osal/osal_thread.h"
 #include "osal/osal_time.h"
 #include "osal/osal_message_queue.h"
 #include "danp/danp.h"
 #include "danp/danp_buffer.h"
 #include "../danp_debug.h"
+#include "../danp_internal_types.h"
 #include "danp/drivers/danp_lo.h"
 
 /* Imports */

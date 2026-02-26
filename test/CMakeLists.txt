@@ -43,14 +43,24 @@ endif()
 
 set(TEST_NAME ${PROJECT_NAME}UnitTest)
 
-add_executable(${TEST_NAME} 
-    ${CMAKE_CURRENT_SOURCE_DIR}/test_danp.c
+add_executable(${TEST_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_core.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_dgram.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_route.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_stream.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_zerocopy.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/log_message.c
+)
+
+target_include_directories(${TEST_NAME}
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
 )
 
 target_link_libraries(${TEST_NAME}
     PRIVATE
         ${PROJECT_NAME}::${PROJECT_NAME}
-        Unity::unity 
+        Unity::unity
 )
 
 add_test(

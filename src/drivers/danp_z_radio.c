@@ -45,15 +45,15 @@ static int32_t danp_radio_tx(void *iface_common, danp_packet_t *packet)
     {
         DANP_LOG_IO_VER(
             "Radio TX: Outgoing packet: [dst]=%u [port]=%u [flags]=0x%02X [len]=%u",
-            (packet->header_raw >> 22) & 0xFF,
-            (packet->header_raw >> 8) & 0x3F,
-            packet->header_raw & 0x03,
-            packet->length);
+            (danp_packet_get_header(packet) >> 22) & 0xFF,
+            (danp_packet_get_header(packet) >> 8) & 0x3F,
+            danp_packet_get_header(packet) & 0x03,
+            danp_packet_get_length(packet));
 
         ret = radio_ctrl_transmit(
             radio_ctx->radio_dev,
             (const uint8_t *)packet,
-            packet->length + sizeof(packet->header_raw));
+            danp_packet_get_length(packet) + sizeof(uint32_t));
         if (ret < 0)
         {
             DANP_LOG_IO_ERR("Radio TX: Failed: %08X", ret);
@@ -108,20 +108,20 @@ static void danp_radio_rx_routine(void *arg)
         ret = radio_ctrl_receive(
             radio_ctx->radio_dev,
             (uint8_t *)pkt,
-            sizeof(pkt->payload) + sizeof(pkt->header_raw),
+            DANP_MAX_PACKET_SIZE + sizeof(uint32_t),
             NULL,
             DANP_DRIVER_RADIO_TIMEOUT_MS);
         if (ret > 0)
         {
-            pkt->length = ret - sizeof(pkt->header_raw);
+            danp_packet_set_length(pkt, ret - sizeof(uint32_t));
 
-            if (ret < (int32_t)sizeof(pkt->header_raw))
+            if (ret < (int32_t)sizeof(uint32_t))
             {
                 DANP_LOG_IO_WRN("Radio RX: received packet too short");
                 continue;
             }
 
-            DANP_LOG_IO_VER("Radio RX: Incoming packet: [len]=%u", pkt->length);
+            DANP_LOG_IO_VER("Radio RX: Incoming packet: [len]=%u", danp_packet_get_length(pkt));
 
             danp_input(&radio_iface->common, pkt);
             pkt = NULL; // Ownership transferred to danp_input
@@ -148,7 +148,8 @@ int32_t danp_radio_init(
         .cb_mem = NULL,
         .cb_size = 0,
     };
-    danp_radio_context_t *radio_ctx = NULL;
+    static danp_radio_context_t static_radio_ctx;
+    danp_radio_context_t *radio_ctx = &static_radio_ctx;
 
     for (;;)
     {
@@ -161,14 +162,7 @@ int32_t danp_radio_init(
 
         memset(iface, 0, sizeof(danp_radio_interface_t));
 
-        radio_ctx = (danp_radio_context_t *)malloc(sizeof(danp_radio_context_t));
-        if (NULL == radio_ctx)
-        {
-            ret = -1;
-            DANP_LOG_IO_ERR("Failed to allocate radio context");
-            break;
-        }
-
+        // Use static context instead of malloc
         radio_ctx->radio_dev = radio_dev;
 
         iface->common.address = address;

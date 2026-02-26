@@ -71,7 +71,11 @@ add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 target_sources(${PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/danp.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_int.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_accessors.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_socket.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_buffer.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_route.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/danp_zerocopy.c
 )
 
 # ==============================================================================
@@ -113,6 +117,17 @@ target_compile_options(${PROJECT_NAME}
         $<$<C_COMPILER_ID:MSVC>:
             /W4
         >
+)
+
+# ==============================================================================
+# Dependencies
+# ==============================================================================
+
+find_package(Osal REQUIRED)
+
+target_link_libraries(${PROJECT_NAME}
+    PUBLIC
+        Osal::Osal
 )
 
 # ==============================================================================

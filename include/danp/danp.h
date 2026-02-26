@@ -164,6 +164,12 @@ void danp_register_interface(danp_interface_t *iface);
 int32_t danp_socket_init(void);
 
 /**
+ * @brief Initialize the routing subsystem.
+ * @return int32_t
+ */
+int32_t danp_route_init(void);
+
+/**
  * @brief Create a new DANP socket.
  * @param type Type of the socket (DGRAM or STREAM).
  * @return Pointer to the created socket, or NULL on failure.
@@ -325,6 +331,71 @@ int32_t danp_send_sfp(danp_socket_t *sock, void *data, uint16_t len);
  * @return Pointer to first packet in chain (caller must free all), or NULL on timeout/error.
  */
 danp_packet_t *danp_recv_sfp(danp_socket_t *sock, uint32_t timeout_ms);
+
+// Accessors
+
+/**
+ * @brief Get the remote node address of a socket.
+ * @param sock Pointer to the socket.
+ * @return Remote node address.
+ */
+uint16_t danp_socket_get_remote_node(danp_socket_t *sock);
+
+/**
+ * @brief Get the remote port number of a socket.
+ * @param sock Pointer to the socket.
+ * @return Remote port number.
+ */
+uint16_t danp_socket_get_remote_port(danp_socket_t *sock);
+
+/**
+ * @brief Get the local port number of a socket.
+ * @param sock Pointer to the socket.
+ * @return Local port number.
+ */
+uint16_t danp_socket_get_local_port(danp_socket_t *sock);
+
+/**
+ * @brief Get the current state of a socket.
+ * @param sock Pointer to the socket.
+ * @return Socket state.
+ */
+danp_socket_state_t danp_socket_get_state(danp_socket_t *sock);
+
+/**
+ * @brief Get the payload pointer of a packet.
+ * @param pkt Pointer to the packet.
+ * @return Pointer to the payload data.
+ */
+uint8_t *danp_packet_get_payload(danp_packet_t *pkt);
+
+/**
+ * @brief Get the payload length of a packet.
+ * @param pkt Pointer to the packet.
+ * @return Payload length in bytes.
+ */
+uint16_t danp_packet_get_length(danp_packet_t *pkt);
+
+/**
+ * @brief Set the payload length of a packet.
+ * @param pkt Pointer to the packet.
+ * @param len New payload length in bytes.
+ */
+void danp_packet_set_length(danp_packet_t *pkt, uint16_t len);
+
+/**
+ * @brief Get the raw header of a packet.
+ * @param pkt Pointer to the packet.
+ * @return 32-bit raw header.
+ */
+uint32_t danp_packet_get_header(danp_packet_t *pkt);
+
+/**
+ * @brief Set the raw header of a packet.
+ * @param pkt Pointer to the packet.
+ * @param header New 32-bit raw header.
+ */
+void danp_packet_set_header(danp_packet_t *pkt, uint32_t header);
 
 void danp_print_stats(void (*print_func)(const char *fmt, ...));
 

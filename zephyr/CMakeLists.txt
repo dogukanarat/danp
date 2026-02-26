@@ -45,6 +45,7 @@ zephyr_library_include_directories(
 #------------------------------------------------------------------------------
 zephyr_library_sources(
     ${_DANP_ROOT}/src/danp.c
+    ${_DANP_ROOT}/src/danp_accessors.c
     ${_DANP_ROOT}/src/danp_socket.c
     ${_DANP_ROOT}/src/danp_buffer.c
     ${_DANP_ROOT}/src/danp_route.c

@@ -14,6 +14,7 @@
 
 #include "danp/danp.h"
 #include "danp_debug.h"
+#include "danp_internal_types.h"
 
 /* Types */
 
@@ -35,38 +36,45 @@ static danp_route_entry_t route_table[DANP_MAX_NODES];
 static size_t route_count = 0U;
 
 /** @brief Mutex protecting routing state and interface list. */
-static osal_mutex_handle_t route_mutex;
+static osal_mutex_handle_t route_mutex = NULL;
 
-/**
- * @brief Lazily create and lock the routing mutex.
- * @return true if the mutex is locked, false otherwise.
- */
+/* Functions */
+
+int32_t danp_route_init(void)
+{
+    if (route_mutex != NULL)
+    {
+        return 0;
+    }
+
+    osal_mutex_attr_t attr = {
+        .name = "danpRouteLock",
+        .attr_bits = OSAL_MUTEX_PRIO_INHERIT,
+        .cb_mem = NULL,
+        .cb_size = 0,
+    };
+
+    route_mutex = osal_mutex_create(&attr);
+    if (route_mutex == NULL)
+    {
+        DANP_LOG_ERR("Failed to create routing mutex");
+        return -1;
+    }
+
+    return 0;
+}
+
 static bool danp_route_lock(void)
 {
     if (route_mutex == NULL)
     {
-        osal_mutex_attr_t attr = {
-            .name = "danpRouteLock",
-            .attr_bits = OSAL_MUTEX_PRIO_INHERIT,
-            .cb_mem = NULL,
-            .cb_size = 0,
-        };
-
-        route_mutex = osal_mutex_create(&attr);
-        if (route_mutex == NULL)
-        {
-            /* LCOV_EXCL_START */
-            DANP_LOG_ERR("Failed to create routing mutex");
-            return false;
-            /* LCOV_EXCL_STOP */
-        }
+        /* Must be initialized first */
+        return false;
     }
 
     if (osal_mutex_lock(route_mutex, OSAL_WAIT_FOREVER) != OSAL_SUCCESS)
     {
-        /* LCOV_EXCL_START */
         return false;
-        /* LCOV_EXCL_STOP */
     }
 
     return true;
@@ -79,8 +87,6 @@ static void danp_route_unlock(bool is_locked)
         osal_mutex_unlock(route_mutex);
     }
 }
-
-/* Functions */
 
 static char *danp_trim(char *str)
 {
@@ -132,9 +138,7 @@ static danp_interface_t *danp_route_lookup(uint16_t dest_node_id)
 
     if (!locked)
     {
-        /* LCOV_EXCL_START */
         return NULL;
-        /* LCOV_EXCL_STOP */
     }
 
     for (size_t i = 0; i < route_count; i++)
@@ -157,9 +161,7 @@ void danp_start_interfaces(void)
 
     if (!locked)
     {
-        /* LCOV_EXCL_START */
         return;
-        /* LCOV_EXCL_STOP */
     }
 
     while (cur)
@@ -178,9 +180,7 @@ void danp_stop_interfaces(void)
 
     if (!locked)
     {
-        /* LCOV_EXCL_START */
         return;
-        /* LCOV_EXCL_STOP */
     }
 
     while (cur)
@@ -199,9 +199,7 @@ void danp_shutdown_interfaces(void)
 
     if (!locked)
     {
-        /* LCOV_EXCL_START */
         return;
-        /* LCOV_EXCL_STOP */
     }
 
     while (cur)
@@ -239,9 +237,7 @@ void danp_register_interface(danp_interface_t *iface)
     locked = danp_route_lock();
     if (!locked)
     {
-        /* LCOV_EXCL_START */
         return;
-        /* LCOV_EXCL_STOP */
     }
 
     if (!iface_list)
@@ -272,9 +268,7 @@ int32_t danp_route_table_load(const char *table)
     locked = danp_route_lock();
     if (!locked)
     {
-        /* LCOV_EXCL_START */
         return -1;
-        /* LCOV_EXCL_STOP */
     }
 
     const size_t len = strlen(table);
@@ -285,13 +279,15 @@ int32_t danp_route_table_load(const char *table)
         return 0;
     }
 
-    char *buffer = (char *)malloc(len + 1U);
-    if (!buffer)
-    {
-        DANP_LOG_ERR("Failed to allocate buffer for routing table");
+    // Use a fixed size buffer on stack instead of malloc
+    #define ROUTE_BUFFER_SIZE 256
+    if (len >= ROUTE_BUFFER_SIZE) {
+        DANP_LOG_ERR("Routing table too large for static buffer");
         danp_route_unlock(locked);
         return -1;
     }
+
+    char buffer[ROUTE_BUFFER_SIZE];
     memcpy(buffer, table, len + 1U);
 
     char *saveptr = NULL;
@@ -312,7 +308,6 @@ int32_t danp_route_table_load(const char *table)
         {
             DANP_LOG_ERR("Invalid route entry '%s' (missing ':')", working);
             route_count = 0U;
-            free(buffer);
             danp_route_unlock(locked);
             return -1;
         }
@@ -325,7 +320,6 @@ int32_t danp_route_table_load(const char *table)
         {
             DANP_LOG_ERR("Invalid route entry '%s'", entry);
             route_count = 0U;
-            free(buffer);
             danp_route_unlock(locked);
             return -1;
         }
@@ -336,7 +330,6 @@ int32_t danp_route_table_load(const char *table)
         {
             DANP_LOG_ERR("Invalid destination node '%s'", dest_str);
             route_count = 0U;
-            free(buffer);
             danp_route_unlock(locked);
             return -1;
         }
@@ -345,7 +338,6 @@ int32_t danp_route_table_load(const char *table)
         {
             DANP_LOG_ERR("Routing table full, cannot add destination %lu", dest_val);
             route_count = 0U;
-            free(buffer);
             danp_route_unlock(locked);
             return -1;
         }
@@ -355,7 +347,6 @@ int32_t danp_route_table_load(const char *table)
         {
             DANP_LOG_ERR("Interface '%s' not registered for destination %lu", iface_str, dest_val);
             route_count = 0U;
-            free(buffer);
             danp_route_unlock(locked);
             return -1;
         }
@@ -382,7 +373,6 @@ int32_t danp_route_table_load(const char *table)
         entry = strtok_r(NULL, "\n,", &saveptr);
     }
 
-    free(buffer);
     danp_route_unlock(locked);
     return 0;
 }

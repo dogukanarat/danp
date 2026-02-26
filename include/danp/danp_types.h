@@ -8,6 +8,8 @@
 /// Includes
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 #include "osal/osal_message_queue.h"
 #include "osal/osal_semaphore.h"
@@ -57,7 +59,8 @@ typedef enum danp_log_level_e
     DANP_LOG_LEVEL_DBG,        ///< Debug logging.
     DANP_LOG_LEVEL_INF,        ///< Informational logging.
     DANP_LOG_LEVEL_WRN,        ///< Warning logging.
-    DANP_LOG_LEVEL_ERR         ///< Error logging.
+    DANP_LOG_LEVEL_ERR,        ///< Error logging.
+    DANP_LOG_LEVEL_MAX
 } danp_log_level_t;
  
 /// @brief Socket types.
@@ -84,40 +87,11 @@ typedef osal_message_queue_handle_t danp_os_queue_handle_t;
 /// @brief Handle for an OS semaphore.
 typedef osal_semaphore_handle_t danp_os_semaphore_handle_t;
  
-/// @brief Structure representing a DANP socket.
-typedef struct danp_socket_s
-{
-    danp_socket_state_t state; ///< Current state of the socket.
-    danp_socket_type_t type;   ///< Type of the socket.
+/// @brief Structure representing a DANP socket (Opaque).
+typedef struct danp_socket_s danp_socket_t;
  
-    // Addressing
-    uint16_t local_port;  ///< Local port number.
-    uint16_t local_node;  ///< Local node address.
-    uint16_t remote_node; ///< Remote node address.
-    uint16_t remote_port; ///< Remote port number.
- 
-    // Reliability State (Stop-and-Wait)
-    uint8_t tx_seq;         ///< Transmit sequence number.
-    uint8_t rx_expected_seq; ///< Expected receive sequence number.
- 
-    // RTOS Handles
-    danp_os_queue_handle_t rx_queue;     ///< Queue for received packets.
-    danp_os_queue_handle_t accept_queue; ///< Queue for accepted connections.
-    danp_os_semaphore_handle_t signal;  ///< Semaphore for signaling.
- 
-    struct danp_socket_s *next; ///< Pointer to the next socket in the list.
-} danp_socket_t;
- 
-/// @brief Structure representing a DANP packet.
-typedef struct danp_packet_s
-{
-    uint32_t header_raw;                    ///< Raw header data.
-    uint8_t payload[DANP_MAX_PACKET_SIZE]; ///< Payload data.
- 
-    uint16_t length;                       ///< Length of the payload.
-    struct danp_interface_s *rx_interface;   ///< Interface where the packet was received.
-    struct danp_packet_s *next;            ///< Pointer to next packet (for chaining/fragmentation).
-} danp_packet_t;
+/// @brief Structure representing a DANP packet (Opaque).
+typedef struct danp_packet_s danp_packet_t;
 
 /// @brief Structure representing interface operations.
 typedef struct danp_interface_ops_s
@@ -141,7 +115,7 @@ typedef struct danp_interface_s
 
     danp_interface_ops_t ops;    ///< Interface operations.
     danp_interface_data_t data;  ///< Interface state data.
- 
+
     struct danp_interface_s *next; ///< Pointer to the next interface in the list.
 } danp_interface_t;
 

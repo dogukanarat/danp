@@ -14,6 +14,7 @@
 #include "danp/danp_buffer.h"
 #include "danp/danp_types.h"
 #include "danp_debug.h"
+#include "danp_internal_types.h"
 
 /* Imports */
 
@@ -437,11 +438,20 @@ int32_t danp_bind(danp_socket_t *sock, uint16_t port)
     return ret;
 }
 
-int danp_listen(danp_socket_t *sock, int backlog)
+int32_t danp_listen(danp_socket_t *sock, int backlog)
 {
+    int32_t ret = 0;
     UNUSED(backlog);
+
+    if (osal_mutex_lock(mutex_socket, OSAL_WAIT_FOREVER) != OSAL_SUCCESS)
+    {
+        return -1;
+    }
+
     sock->state = DANP_SOCK_LISTENING;
-    return 0;
+    
+    osal_mutex_unlock(mutex_socket);
+    return ret;
 }
 
 int32_t danp_close(danp_socket_t *sock)

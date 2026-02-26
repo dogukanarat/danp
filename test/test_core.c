@@ -15,6 +15,7 @@
 
 #include "danp/danp.h"
 #include "danp/danp_buffer.h"
+#include "danp_internal_types.h"
 
 static int32_t core_loopback_tx(void *iface_common, danp_packet_t *packet)
 {

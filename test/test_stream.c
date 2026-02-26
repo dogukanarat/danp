@@ -17,6 +17,7 @@
 
 #include "danp/danp.h"
 #include "danp/danp_buffer.h"
+#include "danp_internal_types.h"
 
 /* ============================================================================
  * Test Configuration

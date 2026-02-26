@@ -6,6 +6,7 @@
 #include "unity/unity.h"
  
 #include "danp/danp.h"
+#include "danp_internal_types.h"
 
 /* ============================================================================
  * Test Interface Configuration
